@@ -57,8 +57,8 @@ along the way become `FREE` (and any stale occupancy there is cleared), the retu
 becomes `OCCUPIED`, everything else stays `UNKNOWN`. Observations accumulate across scans
 inside a bounded window around the vehicle.
 
-**Corridor containment without integer variables.** For a degree-*p* B-spline, each curve
-span is the convex hull of *p+1* consecutive control points. Control points are allocated
+**Corridor containment without integer variables.** For a degree-*d* B-spline, each curve
+span is the convex hull of *d+1* consecutive control points. Control points are allocated
 into *exclusive* pools (constrained to one corridor) separated by *bridge* pools of exactly
 *p* points constrained to the **intersection** of two adjacent corridors. Every window of
 *p+1* consecutive control points therefore lies wholly within at least one corridor, so
