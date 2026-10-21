@@ -68,7 +68,7 @@ every curve segment is contained — in continuous time, with no mixed-integer a
 
 ## Coordinate conventions — read this first
 
-**Everything is NED.** North-East-Down, metres.
+**Everything is NED.** North-East-Down, meters.
 
 - **`z` is negative-up.** An altitude of 5 m is `z = -5.0`. This trips up almost everyone,
   and has historically caused real bugs in this codebase (a geofence that demanded `z >= 0`
@@ -76,7 +76,7 @@ every curve segment is contained — in continuous time, with no mixed-integer a
 - **The world is centred on the origin.** `map_bounds` is a *full extent*, so the reachable
   region is `±map_bounds/2` on each axis. With the default `(100, 100, 15)` that is
   x,y ∈ [-50, +50] and z ∈ [-7.5, +7.5] — i.e. only **7.5 m of usable altitude**.
-- **`min_altitude` is positive-up** (metres above ground) and converted internally. It is
+- **`min_altitude` is positive-up** (meters above ground) and converted internally. It is
   the one field that does not follow the sign convention, because it reads more naturally.
 
 If the planner mysteriously refuses to produce corridors, check these first.
@@ -154,8 +154,8 @@ auto grid = std::make_shared<mapping::SparseVoxelGrid>(voxel_resolution, drone_r
 
 // 2. Feed it sensor data. Pass the BEAM ORIGIN, not just the returns -- that is what lets
 //    the map record which space was measured empty.
-std::vector<Eigen::Vector3d> hits = /* LiDAR returns, world frame, NED metres */;
-Eigen::Vector3d sensor_origin     = /* vehicle position, NED metres */;
+std::vector<Eigen::Vector3d> hits = /* LiDAR returns, world frame, NED meters */;
+Eigen::Vector3d sensor_origin     = /* vehicle position, NED meters */;
 grid->update_from_scan(sensor_origin, hits);
 
 // 3. Configure the planner.
@@ -248,7 +248,7 @@ All fields of `FrontEndConfig`, with defaults:
 | `voxel_resolution` | 0.5 | Map cell size (m). Drives cost and precision everywhere. |
 | `drone_physical_radius` | 0.5 | Circumscribed vehicle radius. Corridors are clear by this margin — **your controller's tracking error must stay below it** or the guarantee does not transfer to the vehicle. |
 | `map_bounds` | (100, 100, 15) | Full extent; usable region is ±half on each axis. |
-| `min_altitude` | 0.3 | Metres above ground, positive-up. |
+| `min_altitude` | 0.3 | meters above ground, positive-up. |
 
 ### Corridors
 | Field | Default | Notes |
