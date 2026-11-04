@@ -13,13 +13,19 @@ def plot_trajectory(ctrl_pts, knots, degree, spline_type="clamped", minvo_stenci
     Evaluates and plots the 3D Minimum Snap Trajectory and its control polygon.
     """
     pts = ctrl_pts.T 
+    is_3d = pts.shape[1] == 3
     
     fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # 1. Plot the Control Polygon (The mathematical "gravitational anchors")
-    ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], 'ro--', alpha=0.4, label='Control Polygon')
-    ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c='red', s=30)
+    if is_3d:
+        ax = fig.add_subplot(111, projection='3d')
+        # 1. Plot the Control Polygon (The mathematical "gravitational anchors")
+        ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], 'ro--', alpha=0.4, linewidth=1.5, label='Control Points')
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c='red', s=30)
+    else:
+        ax = fig.add_subplot(111)
+        # 1. Plot the Control Polygon
+        ax.plot(pts[:, 0], pts[:, 1], 'ro--', alpha=0.4, linewidth=1.5, label='Control Points')
+        ax.scatter(pts[:, 0], pts[:, 1], c='red', s=30)
 
     # 2. Plot the MINVO Polygons (The tight "shrink-wrap")
     if minvo_stencils:
@@ -54,28 +60,39 @@ def plot_trajectory(ctrl_pts, knots, degree, spline_type="clamped", minvo_stenci
             label = 'MINVO Bounds' if s == 0 else ""
             
             # Plot using the cycling color!
-            ax.plot(V_closed[:, 0], V_closed[:, 1], V_closed[:, 2], 
-                    color=c, linestyle='--', marker='.', alpha=0.6, linewidth=1.5, label=label)
-            # ax.scatter(V_local[:, 0], V_local[:, 1], V_local[:, 2], c='green', s=20)
+            if is_3d:
+                ax.plot(V_closed[:, 0], V_closed[:, 1], V_closed[:, 2], 
+                        color=c, linestyle='--', marker='.', alpha=0.6, linewidth=1.5, label=label)
+            else:
+                ax.plot(V_closed[:, 0], V_closed[:, 1], 
+                        color=c, linestyle='--', marker='.', alpha=0.6, linewidth=1.5, label=label)
     
     # 2. Evaluate and Plot the actual Minimum Snap B-Spline Curve
     spline = BSpline(knots, pts, degree)
     t_smooth = np.linspace(knots[degree], knots[-degree-1], 100)
     curve = spline(t_smooth)
     
-    ax.plot(curve[:, 0], curve[:, 1], curve[:, 2], 'b-', linewidth=3, label='Min Snap Trajectory')
-    
-    # Plot Start and End constraint points
-    ax.scatter(*curve[0], c='green', s=100, marker='*', label='Start')
-    ax.scatter(*curve[-1], c='purple', s=100, marker='*', label='End')
+    if is_3d:
+        ax.plot(curve[:, 0], curve[:, 1], curve[:, 2], 'b-', linewidth=3, label='B-Spline Trajectory')
+        # Plot Start and End constraint points
+        ax.scatter(*curve[0], c='green', s=100, marker='*', label='Start')
+        ax.scatter(*curve[-1], c='purple', s=100, marker='*', label='End')
+    else:
+        ax.plot(curve[:, 0], curve[:, 1], 'b-', linewidth=3, label='B-Spline Trajectory')
+        # Plot Start and End constraint points
+        ax.scatter(curve[0, 0], curve[0, 1], c='green', s=100, marker='*', label='Start')
+        ax.scatter(curve[-1, 0], curve[-1, 1], c='purple', s=100, marker='*', label='End')
     
     # Formatting
     ax.set_xlabel('X Position')
     ax.set_ylabel('Y Position')
-    ax.set_zlabel('Z Position')
+    # ax.set_zlabel('Z Position')
     ax.set_title('B-Spline Minimum Snap Trajectory')
     ax.legend()
-    ax.set_box_aspect([1, 1, 1]) 
+    if is_3d:
+        ax.set_box_aspect([1, 1, 1]) 
+    else:
+        ax.set_aspect('equal', 'box')
     plt.show()
 
 

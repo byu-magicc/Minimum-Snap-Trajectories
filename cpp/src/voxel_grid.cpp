@@ -18,22 +18,94 @@ void SparseVoxelGrid::update_from_scan(const Eigen::Vector3d& sensor_origin,
     if (!accumulate_) {
         free_voxels_.clear();
         occupied_voxels_raw_.clear();
+        occupied_dirty_ = true;
         frontier_valid_ = false;
     }
 
     // 1. Sweep the beams. Each traversed cell is measured-empty, so it becomes FREE and any
     //    occupancy recorded there previously is cleared -- that is what keeps an
     //    accumulated map from filling up with ghosts of things that have moved.
+    //    Sweeping past map_window_radius_ is pure waste: prune_to_window() deletes everything
+    //    out there within ten scans, so those cells are walked, hashed, inserted and then
+    //    dropped without ever being read. It stays invisible while beams are sparse and becomes
+    //    the dominant cost when they are not -- the walk is per BEAM, so it scales with angular
+    //    resolution, and it runs in the planner's process on the same single thread as the 50 Hz
+    //    dispatch timer. Measured going from 3.0 to 1.5 deg rings (2360 -> 9440 beams/scan) with
+    //    a 70 m sensor range against a 25 m window: 1.89 -> 7.55 M cell-ops/s, and dispatch
+    //    collapsed from ~45 Hz to 7.4 Hz while the planner itself still finished in 9 ms.
+    //    Clamping the sweep to the window cuts that to 3.30 M/s and discards nothing that is kept.
+    const double window_sq = map_window_radius_ * map_window_radius_;
     for (const auto& hit : hits) {
-        raycast_mark_free(sensor_origin, hit);
+        const Eigen::Vector3d ray = hit - sensor_origin;
+        const double len_sq = ray.squaredNorm();
+        if (len_sq > window_sq && len_sq > 0.0) {
+            raycast_mark_free(sensor_origin,
+                              sensor_origin + ray * (map_window_radius_ / std::sqrt(len_sq)));
+        } else {
+            raycast_mark_free(sensor_origin, hit);
+        }
     }
 
     // 2. Returns are OCCUPIED, and win over freedom: a beam grazing the corner of a cell
-    //    where another beam terminated must not clear it.
+    //    where another beam terminated must not clear it. Returns beyond the window are skipped
+    //    for the same reason the sweep is clamped -- they would be pruned before being read.
+    //
+    // The depth fill (occupancy_thickness_) runs from HERE, and only for returns that are NEW.
+    // That gate is what makes it affordable: the shadow behind a return does not change between
+    // scans, so re-walking it for every already-known hit is pure repetition. On a 6480-return
+    // scan the unconditional version cost +31% on update_from_scan -- the component that was
+    // already starving the 50 Hz dispatch loop -- while gating it on new occupancy makes the
+    // cost proportional to how much of the map is actually new, which in an accumulating map
+    // decays to near nothing after the first few scans. Pruning removes the hit along with its
+    // shadow, so a cell re-entering the window is re-inserted as new and refills correctly.
+    const double fill_step = 0.5 * voxel_resolution_;
+    const int fill_steps = occupancy_thickness_ > 0.0
+        ? static_cast<int>(std::ceil(occupancy_thickness_ / fill_step)) : 0;
+
     for (const auto& hit : hits) {
+        if ((hit - sensor_origin).squaredNorm() > window_sq) continue;
         const Eigen::Vector3i idx = to_index(hit);
         if (free_voxels_.erase(idx)) changed_cells_.push_back(idx);
-        if (occupied_voxels_raw_.insert(idx).second) changed_cells_.push_back(idx);
+        const bool new_hit = occupied_voxels_raw_.insert(idx).second;
+        if (new_hit) {
+            changed_cells_.push_back(idx);
+            occupied_dirty_ = true;
+        }
+        // NOT gated on new_hit. Gating there was tried and reverted: a later vantage sees the
+        // same surface at a different angle, so its shadow covers DIFFERENT cells, and skipping
+        // already-known returns left interior cells permanently open (the trunk test caught it).
+
+        // GIVE THE RETURN DEPTH.
+        //
+        // A beam deposits occupancy in exactly the cell it ends in and nothing past it, so the
+        // far side of the object it just hit is sensor shadow: never observed, hence UNKNOWN,
+        // and UNKNOWN is not blocked. Inflation covers most of a trunk from a densely-sampled
+        // near surface -- measured 18 of 20 interior cells on a 1.3 m trunk -- but not the
+        // deepest cells, and a corridor built in that shadow is clipped by nothing and may
+        // reach ~0.5 m into solid wood against a 0.49 m hull.
+        //
+        // STOP AT MEASURED-FREE. If a beam has been through a cell it is empty, and inference
+        // from a neighbouring return must never overrule a measurement -- that rule is what
+        // keeps a swept gap behind a thin obstacle open instead of walling off a real route.
+        // free_voxels_ already holds this scan's sweep, because step 1 ran first.
+        if (fill_steps == 0) continue;
+        const Eigen::Vector3d ray = hit - sensor_origin;
+        const double len = ray.norm();
+        if (len < 1e-9) continue;
+        const Eigen::Vector3d dir = ray / len;
+        Eigen::Vector3i last_idx = idx;
+        for (int k = 1; k <= fill_steps; ++k) {
+            const Eigen::Vector3d p = hit + dir * (k * fill_step);
+            if ((p - sensor_origin).squaredNorm() > window_sq) break;
+            const Eigen::Vector3i c = to_index(p);
+            if (c == last_idx) continue;      // half-res sampling revisits cells; skip cheaply
+            last_idx = c;
+            if (free_voxels_.find(c) != free_voxels_.end()) break;
+            if (occupied_voxels_raw_.insert(c).second) {
+                changed_cells_.push_back(c);
+                occupied_dirty_ = true;
+            }
+        }
     }
 
     // 3. Bound memory and query cost. Pruning walks the whole map, so amortise it rather
@@ -45,7 +117,22 @@ void SparseVoxelGrid::update_from_scan(const Eigen::Vector3d& sensor_origin,
     }
 
     // 4. Derived structures (inflated set / continuous bounds / KD-tree) follow occupancy.
-    rebuild_derived_from_occupied();
+    // 4. Derived structures (inflated set / continuous bounds / KD-tree) are a pure function of
+    //    occupied_voxels_raw_, so they only need rebuilding when THAT changed. Rebuilding
+    //    unconditionally was the dominant per-scan cost once the map got dense: the rebuild
+    //    stamps a 5x5x5 inflation box per occupied voxel and then builds a KD-tree over the
+    //    result, so at ~3400 occupied cells in the window it was ~425k hash inserts plus a
+    //    425k-point tree, every scan, in the planner's process on the 50 Hz dispatch thread.
+    //    It never showed up in the shakeout world (a handful of pillars) and became the wall in
+    //    a 163-trunk forest.
+    //
+    //    Free-space changes are frequent, but OCCUPANCY changes are not: in a static scene most
+    //    scans re-hit cells already known solid, and insert() reports no change. Skipping the
+    //    rebuild then is exact, not an approximation -- there is nothing new to derive.
+    if (occupied_dirty_) {
+        rebuild_derived_from_occupied();
+        occupied_dirty_ = false;
+    }
 
     // 5. Frontier is computed lazily on demand -- see get_unknown_frontier().
     frontier_dirty_ = true;
@@ -60,7 +147,8 @@ void SparseVoxelGrid::prune_to_window(const Eigen::Vector3d& sensor_origin) {
         it = out_of_window(*it) ? free_voxels_.erase(it) : std::next(it);
     }
     for (auto it = occupied_voxels_raw_.begin(); it != occupied_voxels_raw_.end();) {
-        it = out_of_window(*it) ? occupied_voxels_raw_.erase(it) : std::next(it);
+        if (out_of_window(*it)) { it = occupied_voxels_raw_.erase(it); occupied_dirty_ = true; }
+        else { ++it; }
     }
 }
 
@@ -82,6 +170,49 @@ void SparseVoxelGrid::rebuild_derived_from_occupied() {
             for (int y = a.y(); y <= b.y(); ++y)
                 for (int z = a.z(); z <= b.z(); ++z)
                     occupied_voxels_inflated_.insert(Eigen::Vector3i(x, y, z));
+    }
+
+    // Proximity field, stamped in the SAME pass so it costs one extra shell rather than a
+    // second sweep of the map. Only the cells between the inflated boundary and heat_radius_
+    // beyond it get an entry: anything closer is untraversable, anything further is free.
+    //
+    // Combined with max() rather than summed. Heat is "how close is the nearest obstacle",
+    // which is a property of the cell, not a tally of its neighbours -- adding contributions
+    // would make a cell between two distant trunks look worse than one grazing a single trunk,
+    // which is the opposite of what a clearance cost should say.
+    heat_.clear();
+    if (heat_radius_ > 0.0) {
+        const double halo = inflation_radius_ + heat_radius_;
+        for (const auto& idx : occupied_voxels_raw_) {
+            const Eigen::Vector3d c = to_center(idx);
+            const Eigen::Vector3i a = to_index(c - Eigen::Vector3d::Constant(half + halo));
+            const Eigen::Vector3i b = to_index(c + Eigen::Vector3d::Constant(half + halo));
+            for (int x = a.x(); x <= b.x(); ++x) {
+                for (int y = a.y(); y <= b.y(); ++y) {
+                    for (int z = a.z(); z <= b.z(); ++z) {
+                        const Eigen::Vector3i cell(x, y, z);
+                        // Inside the inflated set the cell is untraversable; no heat needed.
+                        if (occupied_voxels_inflated_.count(cell)) { continue; }
+                        // Measure from the INFLATED BOUNDARY, not the obstacle centre. The
+                        // inflated set is stamped as a box reaching (half + inflation_radius_)
+                        // from the centre, so subtracting inflation_radius_ alone leaves every
+                        // non-inflated cell already at d >= heat_radius_ and the field comes out
+                        // silently EMPTY -- the two measures have to share an origin.
+                        const double d = (to_center(cell) - c).norm()
+                                       - (half + inflation_radius_);
+                        if (d >= heat_radius_) { continue; }
+                        // Linear falloff, clamped to [0, 1]. Squared falloff was considered but
+                        // linear keeps the gradient non-zero right out to the rim, which is where
+                        // the search most needs a reason to pick the wider gap.
+                        const float h = static_cast<float>(
+                            std::max(0.0, std::min(1.0, 1.0 - d / heat_radius_)));
+                        auto it = heat_.find(cell);
+                        if (it == heat_.end()) { heat_.emplace(cell, h); }
+                        else if (h > it->second) { it->second = h; }
+                    }
+                }
+            }
+        }
     }
 
     rebuild_kdtree();
@@ -131,6 +262,7 @@ void SparseVoxelGrid::raycast_mark_free(const Eigen::Vector3d& origin,
             changed_cells_.push_back(cur);
         }
         if (occupied_voxels_raw_.erase(cur)) {   // measured through it -> it is not solid
+            occupied_dirty_ = true;
             changed_cells_.push_back(cur);
         }
 
@@ -217,6 +349,12 @@ void SparseVoxelGrid::compute_unknown_frontier() const {
     }
 }
 
+double SparseVoxelGrid::heat_at(const Eigen::Vector3i& idx) const {
+    if (heat_.empty()) { return 0.0; }
+    auto it = heat_.find(idx);
+    return it == heat_.end() ? 0.0 : static_cast<double>(it->second);
+}
+
 bool SparseVoxelGrid::is_free(const Eigen::Vector3i& idx) const {
     return free_voxels_.count(idx) > 0;
 }
@@ -283,6 +421,8 @@ void SparseVoxelGrid::update_from_obstacles(const std::vector<ObstacleBox>& obst
         }
     }
 
+    // This path builds the derived structures itself, so nothing is left pending.
+    occupied_dirty_ = false;
     rebuild_kdtree();
 }
 

@@ -73,7 +73,20 @@ private:
 // ==========================================
 class AsymmetricBoxBuilder {
 public:
-    AsymmetricBoxBuilder(double drone_physical_radius, double max_cp_drift, double voxel_resolution = 1.0);
+    /**
+     * @param obstacle_inflation how much the obs_points handed to build_bounds have ALREADY been
+     *        inflated by. 0 means raw obstacle cells. The box is shrunk to keep
+     *        drone_physical_radius from the raw surface, so supplying this is what stops the
+     *        clearance already baked into the inflation being counted a second time.
+     */
+    /// clamp_relief=true (default) is the SAFE policy: relief = min(0, inflation - hull), so
+    /// inflation the map already applied is never handed back and the corridor keeps
+    /// obstacle_margin as cover for state-estimation error. false gives the margin back --
+    /// wider corridors, but the box then guarantees only the bare hull. Exposed so the
+    /// trade can be MEASURED rather than argued; see tools/monte_carlo.
+    AsymmetricBoxBuilder(double drone_physical_radius, double max_cp_drift,
+                         double voxel_resolution = 1.0, double obstacle_inflation = 0.0,
+                         bool clamp_relief = true);
 
     /**
      * Calculates local axes and uses True Segment Distance Sorting and
@@ -92,6 +105,8 @@ private:
     double drone_radius_;
     double voxel_resolution_;
     double max_drift_;
+    double obstacle_inflation_;
+    bool clamp_relief_ = true;
 };
 
 // ==========================================
@@ -117,7 +132,8 @@ public:
     AsymmetricSFCManager(std::shared_ptr<mapping::SparseVoxelGrid> grid,
                          double drone_physical_radius,
                          double max_cp_drift,
-                         double voxel_resolution = 1.0);
+                         double voxel_resolution = 1.0,
+                         bool clamp_relief = true);
 
     /**
      * Full pipeline: Scanner → Builder → OBB Adapter → SFCResult.

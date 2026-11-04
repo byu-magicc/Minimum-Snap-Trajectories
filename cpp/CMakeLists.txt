@@ -71,7 +71,17 @@ add_executable(bspline_tests
     tests/test_min_snap.cpp
     tests/test_optimize.cpp
     tests/test_astar.cpp
+    tests/test_blocked_start.cpp
     tests/test_voxel_grid.cpp
+    tests/test_occupancy_thickness.cpp
+    tests/test_heat_field.cpp
+    tests/test_segment_merge.cpp
+    tests/test_corridor_clearance.cpp
+    tests/test_corridor_clearance_integration.cpp
+    tests/test_chain_length.cpp
+    tests/test_altitude_ceiling.cpp
+    tests/test_translation_invariance.cpp
+    tests/test_path_hysteresis.cpp
     tests/test_sfc.cpp
     tests/test_front_end.cpp
     tests/test_trajectory_planner.cpp
@@ -99,6 +109,29 @@ option(BUILD_EXAMPLES "Build example programs" ON)
 if(BUILD_EXAMPLES)
     add_executable(minimal_planner_loop examples/minimal_planner_loop.cpp)
     target_link_libraries(minimal_planner_loop PRIVATE min_snap_engine)
+
+    # Offline reproduction of a QP failure captured in flight. Replays a logged corridor chain
+    # through the real back end, so a hypothesis about why a solve failed costs a millisecond
+    # instead of a sim run.
+    add_executable(repro_forest_stall tools/repro_forest_stall.cpp)
+    target_link_libraries(repro_forest_stall PRIVATE min_snap_engine)
+
+    add_executable(replay_stall tools/replay_stall.cpp)
+    target_link_libraries(replay_stall PRIVATE min_snap_engine)
+
+    add_executable(monte_carlo tools/monte_carlo.cpp)
+    target_link_libraries(monte_carlo PRIVATE min_snap_engine)
+    # The harness uses the SAME directional gate the vehicle flies (header-only, Eigen + STL
+    # only). Scoped to this tool: min_snap_engine must not gain a roscopter dependency -- the
+    # dependency runs the other way.
+    target_include_directories(monte_carlo PRIVATE
+        /home/apd915/rosflight_ws/src/roscopter/roscopter/include)
+
+    add_executable(wall_probe tools/wall_probe.cpp)
+    target_link_libraries(wall_probe PRIVATE min_snap_engine)
+
+    add_executable(vmax_probe tools/vmax_probe.cpp)
+    target_link_libraries(vmax_probe PRIVATE min_snap_engine)
 endif()
 
 # ==========================================

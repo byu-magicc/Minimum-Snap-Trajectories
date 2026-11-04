@@ -135,6 +135,36 @@ public:
         has_frontier_focus_ = true;
         frontier_dirty_ = true;
     }
+    /**
+     * How far behind a return to keep marking OCCUPIED, in metres. 0 restores the old
+     * single-cell behaviour.
+     *
+     * WHY THIS IS NEEDED. A beam deposits occupancy in exactly the cell it terminates in, and
+     * nothing past it -- so the FAR SIDE of every obstacle sits in sensor shadow and is never
+     * observed. It therefore stays UNKNOWN, and UNKNOWN is not blocked: A* crosses it for
+     * unknown_traversal_cost. The interior of a tree the sensor is staring straight at is
+     * traversable at a small premium, and the corridor builder shrinks only against KNOWN
+     * obstacles, so a spine threading that interior yields a box overlapping a real trunk while
+     * every diagnostic reads healthy.
+     *
+     * Measured on the forest_hard_s2 bottleneck (6 trunks, r 1.1-1.45 m, 1.5 deg beams,
+     * accumulated over a 0->8 m approach): 22 of 55 cells physically inside a trunk were
+     * unblocked in the map. Inflation alone covered only the near ~2.4 m of a 3.6 m trunk.
+     *
+     * A return means a solid surface, and solid things have depth -- so give it some. The fill
+     * STOPS at any cell already measured FREE, which is what keeps a genuine gap behind a thin
+     * obstacle from being walled off: if a beam has been through it, it stays open.
+     *
+     * Sized from the obstacles, not guessed: it wants to cover the deepest object whose far side
+     * you will never see. 1.0 m suits 1.0-1.5 m trunks (inflation then carries the rest).
+     * Too large and unswept gaps behind thin obstacles close up -- conservative, but it costs
+     * routes.
+     */
+    void set_occupancy_thickness(double metres) {
+        occupancy_thickness_ = std::max(0.0, metres);
+    }
+    double occupancy_thickness() const { return occupancy_thickness_; }
+
     bool accumulating() const { return accumulate_; }
 
     /** True if this cell was traversed by a sensor beam (measured empty). */
@@ -180,6 +210,37 @@ public:
     bool is_occupied_raw(const Eigen::Vector3i& idx) const;
 
     /**
+     * Proximity cost in [0, 1] for a traversable cell: 1 at the inflated obstacle boundary,
+     * decaying to 0 at heat_radius beyond it. 0 everywhere else, including inside the inflated
+     * set (which is untraversable anyway) and when the field is disabled.
+     *
+     * This is the soft half of obstacle avoidance. The inflated set is a BINARY test -- a cell is
+     * flyable or it is not -- so a search using it alone has no reason to prefer the middle of a
+     * gap over grazing its edge, and paths hug inflated boundaries and wedge themselves in
+     * places a slightly wider route would have cleared. Charging a graded cost for proximity is
+     * what makes clearance something the search seeks rather than merely tolerates.
+     *
+     * Deliberately a GRADED falloff, not the binary adjacency toll this codebase tried before.
+     * That version added a fixed penalty to every edge leaving a cell next to an obstacle, which
+     * in a forest is nearly every cell, so it behaved as a flat surcharge on the whole search
+     * while destroying the heuristic's guidance (see astar_clearance_cost in front_end.hpp).
+     */
+    double heat_at(const Eigen::Vector3i& idx) const;
+
+    /**
+     * Sets the halo width, in metres, over which heat decays from 1 to 0 beyond the inflated
+     * boundary. <= 0 disables the field entirely and costs nothing to maintain.
+     */
+    void set_heat_radius(double radius_m) {
+        if (radius_m != heat_radius_) {
+            heat_radius_ = radius_m;
+            occupied_dirty_ = true;   // the field is derived from occupancy; force a rebuild
+        }
+    }
+    double heat_radius() const { return heat_radius_; }
+    const std::unordered_map<Eigen::Vector3i, float, Vector3iHash>& get_heat() const { return heat_; }
+
+    /**
      * O(log N) query: Distance to the nearest inflated obstacle voxel center.
      * Returns infinity if grid is empty.
      */
@@ -207,6 +268,27 @@ public:
     // Continuous inflated bounds for the LoS Smoother (AABB raycaster)
     const std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& get_continuous_inflated_bounds() const {
         return continuous_inflated_bounds_;
+    }
+
+    /**
+     * Replace the map wholesale from a snapshot's raw sets and rebuild everything derived.
+     *
+     * EXISTS FOR DEBUGGING A STALL THAT ONLY HAPPENS ON A PARTIAL MAP. The planner stalls at a
+     * reproducible spot outside the trunk field where the LiDAR has swept almost nothing, so A*
+     * is routing largely through UNKNOWN space. Seven hypotheses about that stall were each
+     * tested against an offline harness built from GROUND-TRUTH obstacles, and every one died on
+     * the same gap: a fully-known map is not the map the planner had. Restoring the real one
+     * turns an unreproducible flight bug into an offline test.
+     *
+     * Only the raw sets are stored: the inflated set, continuous bounds, KD-tree and heat field
+     * are all pure functions of them (see rebuild_derived_from_occupied).
+     */
+    void restore_from_snapshot(const std::unordered_set<Eigen::Vector3i, Vector3iHash>& occupied,
+                               const std::unordered_set<Eigen::Vector3i, Vector3iHash>& free)
+    {
+        occupied_voxels_raw_ = occupied;
+        free_voxels_ = free;
+        rebuild_derived_from_occupied();
     }
 
     double get_resolution() const { return voxel_resolution_; }
@@ -256,8 +338,19 @@ private:
     mutable std::vector<Eigen::Vector3d> unknown_frontier_;
     mutable bool frontier_dirty_ = true;
 
+    /// Proximity cost per cell, in [0, 1]. Only populated in the shell between the inflated
+    /// boundary and heat_radius_ beyond it -- cells deeper in are untraversable and cells
+    /// further out are free of charge, so neither needs an entry.
+    std::unordered_map<Eigen::Vector3i, float, Vector3iHash> heat_;
+    double heat_radius_ = 0.0;   ///< 0 disables; see set_heat_radius()
+
+    double occupancy_thickness_ = 0.0;
     bool accumulate_ = true;
     double map_window_radius_ = 25.0;
+    /// Set by any mutation of occupied_voxels_raw_; gates the per-scan rebuild of the derived
+    /// inflated set / bounds / KD-tree, which are a pure function of it. Starts true so the
+    /// first scan always builds them. See the gate in update_from_scan().
+    bool occupied_dirty_ = true;
     double frontier_radius_ = 18.0;
     Eigen::Vector3d last_sensor_origin_ = Eigen::Vector3d::Zero();
     Eigen::Vector3d frontier_focus_ = Eigen::Vector3d::Zero();

@@ -75,12 +75,19 @@ PlanningResult TrajectoryPlanner::plan_mission(
     std::cout << "--- Starting Trajectory Planning Mission ---" << std::endl;
     auto mission_start = std::chrono::high_resolution_clock::now();
 
+    // Reported on PlanningResult; see the braking bound below for why these two are worth
+    // having. Function-scoped because the bound is computed inside a nested block.
+    double measured_d_free = 0.0, measured_v_end = 0.0;
+
     // =========================================================
     // PHASE 1: Front-End (A* + SFC Generation)
     // =========================================================
     std::cout << "[Phase 1] Generating Safe Flight Corridors..." << std::endl;
     auto sfc_start = std::chrono::high_resolution_clock::now();
-    auto fe_result = front_end_->get_corridors_astar(start_pos, end_pos);
+    // An override replays a logged corridor chain instead of searching; see
+    // set_front_end_override(). Inert unless explicitly set.
+    auto fe_result = fe_override_ ? *fe_override_
+                                  : front_end_->get_corridors_astar(start_pos, end_pos);
     auto sfc_end = std::chrono::high_resolution_clock::now();
     double sfc_ms = std::chrono::duration<double, std::milli>(sfc_end - sfc_start).count();
 
@@ -146,9 +153,35 @@ PlanningResult TrajectoryPlanner::plan_mission(
             constexpr double kBrakeMargin = 0.6;
             const double v_safe = std::sqrt(2.0 * a_max_ * kBrakeMargin * d_free_ahead);
 
-            const double v_end_mag = std::min(v_safe, v_max_);
+            // Back the terminal speed off the limit instead of pinning it AT the limit.
+            //
+            // end_vel is a hard EQUALITY in the boundary block, while the MINVO block imposes the
+            // per-axis INEQUALITY |v_i| <= v_max. Setting the magnitude to exactly v_max makes the
+            // two coincide whenever the corridor axis is near-axis-aligned -- a (0,0)->(105,0)
+            // route gives ux ~ (1,0,0), so the pinned end velocity lands exactly on the north
+            // velocity face. The QP is then feasible with ZERO slack, which OSQP converges to only
+            // slowly: it cannot certify a point on the boundary, so it exhausts max_iter and the
+            // retry loop stretches time on a problem that was never over-constrained.
+            //
+            // Observed in a forest benchmark: five consecutive attempts, every one ending in
+            // "maximum iterations reached", with the VELOCITY block the only one violated
+            // (2 rows of 48) and the primal residual falling monotonically 0.0709 -> 0.0496 ->
+            // 0.0436 -> 0.0254 -> 0.0147 without ever clearing tolerance. Corridors and
+            // acceleration were clean throughout -- the geometry was fine, the terminal condition
+            // was simply sitting on a constraint face.
+            //
+            // 10% of headroom costs almost nothing in travel time (the NEXT replan re-accelerates
+            // from this state anyway) and gives the solver an interior point to converge to.
+            const double v_end_mag =
+                std::min(v_safe, config_.terminal_speed_fraction * v_max_);
             if (v_end_mag > 1e-3) end_vel = last.ux * v_end_mag;
+            measured_d_free = d_free_ahead;
+        } else if (!fe_result.corridors.empty()) {
+            const auto& last = fe_result.corridors.back();
+            measured_d_free =
+                std::max(0.0, last.bounds(0) - last.getDistancePrimaryToSecondary());
         }
+        measured_v_end = end_vel.norm();
 
         Eigen::MatrixXd E(3, 3);
         E.col(0) = Eigen::Vector3d::Zero();   // terminal acceleration stays zero
@@ -160,6 +193,12 @@ PlanningResult TrajectoryPlanner::plan_mission(
     // =========================================================
     // Time-Stretching Retry Loop
     // =========================================================
+    // Knot scale, fixed on the FIRST attempt. The retry loop buys flight time by adding a
+    // control point per pool; if h were recomputed each attempt it would renormalise that time
+    // straight back out and every retry would be a no-op.
+    double knot_h = 1.0;
+    bool knot_h_fixed = false;
+
     int max_stretches = 5;
     int stretch_count = 0;
     Eigen::VectorXd optimal_cp;
@@ -176,8 +215,44 @@ PlanningResult TrajectoryPlanner::plan_mission(
     bool solve_success = false;
     int total_control_points = 0;
 
+    // =========================================================
+    // SOLVE IN A LOCAL FRAME
+    // =========================================================
+    // The QP is written in WORLD coordinates, so every corridor half-space carries an offset the
+    // size of the vehicle's distance from the origin while the quantity that actually matters --
+    // the corridor half-width -- is under a metre. Past roughly 45 m the ratio is bad enough that
+    // OSQP declares primal infeasibility on a problem that is comfortably feasible.
+    //
+    // Measured with tools/repro_forest_stall: one identical corridor (real bounds, real axis,
+    // 0.84 m half-width) solves at every origin up to 46 m, needs a retry at 47 m, and fails at
+    // 48 m and beyond. Nothing about the geometry changes -- only where it sits.
+    //
+    // That is the whole "stalls halfway" behaviour: the benchmark is 105 m long, so the vehicle
+    // crosses the threshold near its midpoint and every replan from there on fails, whatever the
+    // corridors look like. It also explains why widening corridors, lengthening the time budget,
+    // lowering the terminal velocity and loosening the acceptance tolerance all changed nothing.
+    //
+    // Shifting the problem so the start is the origin removes the offset entirely: the corridor
+    // constraint A*p <= b becomes A*p' <= b - A*origin, and the boundary conditions shift with it.
+    // Velocities and accelerations are translation-invariant and must NOT be touched. Control
+    // points come back into world coordinates after the solve.
+    const Eigen::Vector3d frame_origin = start_pos;
+
+    SE.col(0) -= frame_origin;                                     // start position
+    if (config_.spline_type == "natural") {
+        SE.col(3) -= frame_origin;                                 // E = [end_pos, 0, 0]
+    } else {
+        SE.col(5) -= frame_origin;                                 // E = [end_acc, end_vel, end_pos]
+    }
+
     // Make mutable copies for stretching
     auto corridors = fe_result.corridors;
+    for (auto& c : corridors) {
+        // A*(p' + origin) <= b  <=>  A*p' <= b - A*origin
+        c.b_vec -= c.A_mat * frame_origin;
+        c.primaryPosition -= frame_origin;
+        c.secondaryPosition -= frame_origin;
+    }
     auto allocation_pools = fe_result.allocation_pools;
     auto allocation_list = fe_result.allocation_list;
 
@@ -232,6 +307,68 @@ PlanningResult TrajectoryPlanner::plan_mission(
 
         int num_segments = total_control_points - config_.degree;
 
+        if (config_.knot_scale && !knot_h_fixed && num_segments > 0) {
+            double total_len = 0.0;
+            for (const auto& c : corridors) total_len += c.getDistancePrimaryToSecondary();
+            const double T_kin = kinematic_time_budget(
+                total_len, v_max_, a_max_, config_.time_budget_factor);
+            // Only ever COMPRESS. h > 1 would slow the trajectory below today's behaviour, which
+            // is never the intent here, and the duration floor means it binds in one direction.
+            if (T_kin > 0.0)
+                knot_h = std::min(1.0, T_kin / static_cast<double>(num_segments));
+            knot_h_fixed = true;
+            std::cout << "[knot_scale] h = " << knot_h << "  (" << num_segments
+                      << " unit segments -> " << (num_segments * knot_h) << " s for "
+                      << total_len << " m)" << std::endl;
+        }
+        const double h = knot_h;
+
+        // --- WHY THIS TRAJECTORY IS SLOWER THAN THE KINEMATICS ALLOW (measured, unfixed) -------
+        // The knot vector is unit-spaced, so duration in seconds EQUALS num_segments. That welds
+        // flight time to control-point COUNT, and the count is set by corridor geometry rather
+        // than by kinematics: every junction contributes a bridge pool of `degree` (4) points.
+        // Those 4 are geometrically required -- by the convex-hull property, `degree` points must
+        // lie in BOTH corridors for the curve to cross without leaving either -- so the count
+        // cannot simply be cut.
+        //
+        // Measured in the forest: 8 corridors over a 15 m horizon allocated 36 control points, 28
+        // of them bridges, giving a 32 s trajectory for 15 m -- 0.47 m/s against a 5 m/s limit,
+        // where the kinematics asked for 3.6 s. Roughly 9x too slow. Replanning at 10 Hz hides it
+        // (only each trajectory's fast opening is ever flown); anything that holds a plan longer
+        // exposes it, which is why the anti-stutter gate cost 31% travel time and path hysteresis
+        // at 0.30 collapsed average speed to 1.02 m/s.
+        //
+        // Rescaling the knots to the kinematic budget (with MINVO bounds scaled by h and h^2) WAS
+        // implemented and reverted. It fixes the single-corridor case cleanly -- 2.71 s, 3.33 m/s,
+        // first-attempt solve in 0.54 ms at time_budget_factor 1.5 -- but compressing a
+        // multi-corridor chain makes velocity binding everywhere and the QP falls apart: the
+        // logged 3-corridor chain went from 1 attempt / 1.3 ms to 6 attempts / 63 ms, relaxing
+        // all the way back to unit knots anyway. Since flight is almost always 4-12 corridors,
+        // that is a net loss. A real fix needs the QP to handle a velocity-binding problem at
+        // scale -- non-uniform knots per segment, or fewer/longer corridors -- not a global
+        // rescale. See tools/repro_forest_stall.cpp, which reproduces both regimes offline.
+        //
+        // RE-TESTED 2026-09-28 at scale, behind FrontEndConfig::knot_scale (still default OFF).
+        // The retest dropped the h^-7 Hessian scaling, on the correct observation that q_osqp is
+        // identically zero so a positive scalar on the objective cannot move the argmin. That
+        // changes nothing, and could not have: feasibility depends only on (A, l, u), and h < 1
+        // TIGHTENS the velocity rows (h) and acceleration rows (h^2). The verdict stands, now on
+        // 1000+ plans instead of one logged chain:
+        //
+        //                        synthetic 20% density      the sim's medium forests
+        //                        OFF  ->  ON                OFF  ->  ON
+        //   R_succ                9.0% ->  1.0%             40.0% ->  0.0%
+        //   stall                 6.0% -> 64.0%              0.0% -> 80.0%
+        //   first-attempt        65.9% -> 39.0%             77.8% -> 67.4%
+        //   OSQP p90 (ms)         4.80 -> 19.48              3.36 ->  9.20
+        //   commanded speed     1.95  ->  1.80 m/s          2.47  ->  2.41 m/s
+        //
+        // Note the last row: speed did not improve even in the 50%-single-corridor forest regime,
+        // the one this is supposed to fix. Compression tightens the velocity rows -> first-attempt
+        // solves fail -> the retry loop adds a control point per pool -> unit knots ARE flight
+        // time, so the added points hand back exactly the duration h removed. It is self-cancelling
+        // on speed and a large net loss on reliability. Do not enable it in flight.
+
         // Row extents of each stacked constraint block, so a failure can be attributed to a
         // named requirement instead of just a residual. Declared out here to survive into
         // the catch.
@@ -243,13 +380,22 @@ PlanningResult TrajectoryPlanner::plan_mission(
             Eigen::MatrixXd W, B_combined, D_vel, D_accel;
             Eigen::MatrixXd SE_qp;
 
+            // Boundary state, expressed in the SCALED parameter. dP/dt = (1/h) dp/ds, so pinning a
+            // real velocity v needs dp/ds = h*v, and an acceleration needs h^2*a. Positions are
+            // unaffected. SE = [start_pos, start_vel, start_acc, end_acc, end_vel, end_pos].
+            Eigen::MatrixXd SE_h = SE;
+            if (h != 1.0) {
+                SE_h.col(1) *= h;      SE_h.col(4) *= h;
+                SE_h.col(2) *= h * h;  SE_h.col(3) *= h * h;
+            }
+
             if (config_.spline_type == "natural") {
                 MinSnapEvalNatural optimizer(num_segments, config_.degree);
                 D_vel = optimizer.getFastCascadedDMatrix(num_segments, config_.degree, 1).transpose();
                 D_accel = optimizer.getFastCascadedDMatrix(num_segments, config_.degree, 2).transpose();
                 W = optimizer.getW();
                 B_combined = optimizer.getBCombined();
-                SE_qp = SE;
+                SE_qp = SE_h;
                 current_knots = optimizer.getKnots();
             } else {
                 MinSnapEvalClamped optimizer(num_segments, config_.degree);
@@ -258,9 +404,11 @@ PlanningResult TrajectoryPlanner::plan_mission(
                 Eigen::MatrixXd B_d3 = optimizer.get_B_d3_matrix(config_.degree);
                 W = optimizer.get_W();
                 B_combined = optimizer.get_B_combined();
-                SE_qp = SE * B_d3;
+                SE_qp = SE_h * B_d3;
                 current_knots = optimizer.get_knots();
             }
+
+            if (h != 1.0) current_knots *= h;   // de Boor and the 50 Hz dispatch see real time
 
             int N = static_cast<int>(W.rows()); // == total_control_points
             Eigen::MatrixXd A_eq = B_combined.transpose(); // N x 6
@@ -317,8 +465,11 @@ PlanningResult TrajectoryPlanner::plan_mission(
             // AXIS, so it permits ||v|| up to v_max*sqrt(3), not v_max.
             const double axis_scale =
                 config_.enforce_norm_limits ? (1.0 / std::sqrt(3.0)) : 1.0;
-            const double v_axis = v_max_ * axis_scale;
-            const double a_axis = a_max_ * axis_scale;
+            // |dP/dt| <= v_axis becomes |dp/ds| <= h*v_axis; acceleration picks up h^2. This is
+            // the block the earlier attempt recorded as "velocity binding everywhere": h < 1
+            // tightens these rows, it does not relax them.
+            const double v_axis = v_max_ * axis_scale * h;
+            const double a_axis = a_max_ * axis_scale * h * h;
             Eigen::VectorXd l_vel = Eigen::VectorXd::Constant(A_vel_3D.rows(), -v_axis);
             Eigen::VectorXd u_vel = Eigen::VectorXd::Constant(A_vel_3D.rows(), v_axis);
             Eigen::VectorXd l_accel = Eigen::VectorXd::Constant(A_accel_3D.rows(), -a_axis);
@@ -406,6 +557,84 @@ PlanningResult TrajectoryPlanner::plan_mission(
             opt_ms += std::chrono::duration<double, std::milli>(opt_end - opt_start).count();
 
             std::cout << "[Phase 4] Solver failed (Kinematically impossible): " << e.what() << std::endl;
+
+            // --- WHAT problem was it asked to solve? ------------------------------------
+            // The blame breakdown below names the constraint BLOCK, which is most often
+            // "boundary(start/end state)" -- but that block is 18 rows pinning a start state
+            // the vehicle is already in against an end state it must arrive at stopped, and
+            // knowing it is implicated says nothing about WHICH of those, or why. The same
+            // 18/18 signature is produced by a start velocity too high to shed in the allotted
+            // time, by a goal outside its own corridor, and by simply not budgeting enough
+            // time -- and the remedies are entirely different. Print the geometry once per
+            // replan (first attempt only; the retry loop re-solves the same problem with more
+            // time and would otherwise repeat this).
+            if (attempts == 1) {
+                const Eigen::Vector3d goal_delta = actual_end_pos - end_pos;
+                std::cout << "[Phase 4] problem: start [" << start_pos.transpose() << "]"
+                          << " |v0| " << start_vel.norm() << " |a0| " << start_acc.norm()
+                          << " -> goal [" << actual_end_pos.transpose() << "]"
+                          << " (dist " << (actual_end_pos - start_pos).norm() << " m";
+                if (goal_delta.norm() > 1e-6) {
+                    // A* stopped short: horizon truncation, an exhausted node budget, or an
+                    // unreachable goal. The QP is then being asked to stop at a waypoint that
+                    // is NOT the one the mission wants.
+                    std::cout << ", TRUNCATED " << goal_delta.norm() << " m short of the "
+                              << "requested goal [" << end_pos.transpose() << "]";
+                }
+                std::cout << ")" << std::endl;
+
+                // num_segments is the flight time in unit knots (1 segment = 1 s), so this is
+                // literally the seconds allotted versus the distance and the speed limit.
+                const double dist = (actual_end_pos - start_pos).norm();
+                std::cout << "[Phase 4] budget: " << num_segments << " s allotted for "
+                          << dist << " m (v_max " << v_max_ << " => "
+                          << (v_max_ > 0.0 ? dist / v_max_ : 0.0) << " s at full speed), "
+                          << total_control_points << " control points" << std::endl;
+
+                // A goal outside its own corridor is infeasible no matter how much time it is
+                // given, and shows up as boundary + corridor rows together.
+                // Per-corridor detail. "narrowest half-width 0 m" alone names neither WHICH
+                // corridor collapsed nor on WHICH axis, and those imply different causes:
+                //   - lateral (y) collapse -> the axis is running flush against inflated cells,
+                //     either because the smoother shortcut it there (sfc_smoother calls
+                //     is_line_of_sight_clear with margin_cells = 0, so a shortcut may graze
+                //     inflation) or because the corridor is measured against the INFLATED set
+                //     rather than raw obstacles, which double-counts the clearance already in it.
+                //   - vertical (z) collapse -> something is constraining altitude that should
+                //     not be, since the forest environments disable the ground plane.
+                // r_y/r_z below is the SAT corner term half_res*L1(u), which is 0.25 m on an
+                // axis-aligned corridor and 0.433 m on a full diagonal -- pure OBB overhead that
+                // is subtracted from every measured clearance, so a diagonal corridor starts
+                // 0.18 m worse off than an aligned one through the same gap.
+                double narrowest = std::numeric_limits<double>::infinity();
+                for (const auto& c : corridors) {
+                    for (int b = 2; b < 6; ++b) {   // lateral and vertical half-extents
+                        narrowest = std::min(narrowest, std::abs(c.bounds(b)));
+                    }
+                }
+                const double half_res = config_.voxel_resolution / 2.0;
+                std::cout << "[Phase 4] corridor bounds (half-extents, m):" << std::endl;
+                for (std::size_t ci = 0; ci < corridors.size(); ++ci) {
+                    const auto& c = corridors[ci];
+                    const double r_y = half_res * c.uy.cwiseAbs().sum();
+                    const double r_z = half_res * c.uz.cwiseAbs().sum();
+                    const bool degenerate =
+                        std::min(std::min(std::abs(c.bounds(2)), std::abs(c.bounds(3))),
+                                 std::min(std::abs(c.bounds(4)), std::abs(c.bounds(5)))) < 1e-6;
+                    std::cout << "            [" << ci << "] len "
+                              << c.getDistancePrimaryToSecondary()
+                              << "  fwd/back " << c.bounds(0) << "/" << c.bounds(1)
+                              << "  y +/- " << c.bounds(2) << "/" << c.bounds(3)
+                              << "  z +/- " << c.bounds(4) << "/" << c.bounds(5)
+                              << "  | ux [" << c.ux.transpose() << "]"
+                              << " r_y " << r_y << " r_z " << r_z
+                              << (degenerate ? "   <== DEGENERATE" : "") << std::endl;
+                }
+                std::cout << "[Phase 4] corridors: " << corridors.size()
+                          << ", narrowest half-width " << narrowest << " m"
+                          << " (drone radius " << config_.drone_physical_radius << " m)"
+                          << std::endl;
+            }
 
             // --- WHICH constraint block is impossible? ---------------------------------
             // Blame is assigned from OSQP's primal-infeasibility certificate where one
@@ -512,7 +741,19 @@ PlanningResult TrajectoryPlanner::plan_mission(
               << "\nTOTAL PLANNING TIME:          " << total_ms << " ms"
               << "\n==================================================" << std::endl;
 
-    return {optimal_cp, current_knots, corridors, config_.degree, total_control_points, solve_success, fe_result.reached_goal, sfc_ms, opt_ms, overhead_ms, total_ms, matrix_ms, attempts};
+    // Back to world coordinates. The control points are flat [x0,y0,z0, x1,y1,z1, ...]; the
+    // corridors are returned for visualisation and the downstream collision re-check, both of
+    // which are world-frame consumers.
+    for (int i = 0; i + 2 < optimal_cp.size(); i += 3) {
+        optimal_cp.segment<3>(i) += frame_origin;
+    }
+    for (auto& c : corridors) {
+        c.b_vec += c.A_mat * frame_origin;
+        c.primaryPosition += frame_origin;
+        c.secondaryPosition += frame_origin;
+    }
+
+    return {optimal_cp, current_knots, corridors, config_.degree, total_control_points, solve_success, fe_result.reached_goal, sfc_ms, opt_ms, overhead_ms, total_ms, matrix_ms, attempts, measured_d_free, measured_v_end};
 }
 
 // ==========================================

@@ -121,7 +121,7 @@ class MinSnapEvalClamped:
         U2 = I[:, 3:-3]
         return U1, U2
     
-    def get_W_matrix(self, rho_vel=0.0, rho_accel=0.0, rho_snap=1.0):
+    def get_W_matrix(self, rho_vel=0.0, rho_accel=1.0, rho_snap=0.0):
         """
         Generates the Penalty matrix (W) for a Clamped Uniform Spline.
         Blends the integrated matrices in O(1) time.
@@ -340,12 +340,12 @@ if __name__ == "__main__":
         # vf = np.random.rand(3, 1) * 5 - 2.5
         # af = np.random.rand(3, 1) * 2 - 1
 
-        p0 = np.array([[0],[0],[0]])
-        v0 = np.array([[-10],[-10],[10]])
-        a0 = np.array([[0],[0],[0]])
-        pf = np.array([[10],[10],[10]])
-        vf = np.array([[-10],[-10],[-10]])
-        af = np.array([[0],[0],[0]])
+        p0 = np.array([[0],[0]])
+        v0 = np.array([[-10],[-10]])
+        a0 = np.array([[0],[0]])
+        pf = np.array([[50],[50]])
+        vf = np.array([[-10],[-10]])
+        af = np.array([[0],[0]])
         
         # Build the boundary constraint matrix
         A_p = np.hstack((p0, v0, a0, af, vf, pf))
@@ -367,7 +367,7 @@ if __name__ == "__main__":
     # print("\n--- 3D Minimum Snap Control Points ---")
     print(C_p_snap.T)
     from utils.visualization import plot_trajectory
-    plot_trajectory(C_p_snap, min_snap_evaluator.knots, snap_degree, minvo_stencils=True)
+    plot_trajectory(C_p_snap, min_snap_evaluator.knots, snap_degree, minvo_stencils=False)
 
 
     # from utils.benchmarks import run_batch_performance_test_clamped, run_clamped_performance_benchmark

@@ -405,7 +405,7 @@ if __name__ == "__main__":
         p0 = np.array([[0],[0],[0]])
         v0 = np.array([[-10],[-10],[10]])
         a0 = np.array([[0],[0],[0]])
-        pf = np.array([[10],[10],[10]])
+        pf = np.array([[50],[50],[30]])
         vf = np.array([[-10],[-10],[-10]])
         af = np.array([[0],[0],[0]])
         
@@ -487,7 +487,7 @@ if __name__ == "__main__":
 
     # Plot the last trajectory from the loop
     from utils.visualization import plot_trajectory, plot_kinematics
-    plot_trajectory(C_p_min_snap_constrained, min_snap_evaluator.knots, degree,spline_type='natural', minvo_stencils=True)
+    plot_trajectory(C_p_min_snap_constrained, min_snap_evaluator.knots, degree,spline_type='natural', minvo_stencils=False)
     # plot_trajectory(C_p_min_snap_constrained, min_snap_evaluator.knots, degree, minvo_stencils=MINVO_STENCILS)
     # plot_kinematics(C_p_min_snap_constrained, min_snap_evaluator.knots, degree, V_max, A_max) # Verify the physics!
 
