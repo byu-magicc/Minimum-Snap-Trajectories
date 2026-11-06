@@ -95,7 +95,8 @@ If the planner mysteriously refuses to produce corridors, check these first.
 | OSQP | 1.0+ | the QP solver; must be installed (see below) |
 | GoogleTest | any | `apt install libgtest-dev` — only for the test suite |
 | nanoflann | bundled | vendored at `cpp/deps/nanoflann.hpp`, nothing to install |
-| pybind11 | fetched | auto-downloaded if Python bindings are enabled |
+| pybind11 | ≥ 2.12 | Python bindings only. pip installs it automatically; a CMake build uses an installed one or downloads 2.13.6. **2.11 (Ubuntu 24.04's `pybind11-dev`) is rejected** — it predates NumPy 2 and segfaults on any array argument. |
+| NumPy | any | Python bindings only |
 
 OSQP is not usually packaged; build it from source:
 
@@ -128,17 +129,107 @@ It is **static** deliberately. As a shared library it tended to exist in two pla
 static archive fails at *link* time with a clear undefined-symbol error instead; a stale
 shared one failed at *run* time with garbage. Nothing needs installing or finding at runtime.
 
+### Python package
+
+The engine ships as the `min_snap` Python package. From a clone:
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # recommended (system Python is PEP 668-managed)
+pip install -e .            # builds cpp/ with scikit-build-core, installs min_snap in editable mode
+python -c "import min_snap; print(min_snap.__version__)"
+```
+
+Only Eigen3 and OSQP need to be installed system-wide (see above); pip fetches pybind11,
+scikit-build-core and NumPy, and skips the GoogleTest suite and examples. The compiled build is
+kept under `build/` so re-running `pip install -e .` after a C++ change is incremental.
+**Python edits under `python/min_snap/` are live; C++ edits need `pip install -e .` again.**
+
+Without pip, a plain CMake build writes the extension module straight into the package:
+
+```bash
+cd cpp/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON && make -j$(nproc) min_snap_bindings
+cd ../.. && PYTHONPATH=python python -c "import min_snap"
+```
+
+Don't mix the two in one environment: a `_core*.so` left in `python/min_snap/` by a CMake
+build can shadow the pip-installed one when `python/` is on `sys.path`.
+
 ### CMake options
 
 | Option | Default | Purpose |
 |---|---|---|
 | `MIN_SNAP_EIGEN_SAFETY` | `ON` | Turn Eigen bounds assertions into exceptions even in release builds. **Leave this on** — see [Gotchas](#gotchas). |
 | `BUILD_EXAMPLES` | `ON` | Build `examples/`. Kept on by default so CI notices if an example stops compiling. |
-| `BUILD_PYTHON_BINDINGS` | `OFF` | The pybind11 module. Off because it does not currently compile — see [Known limitations](#known-limitations). |
+| `BUILD_TESTS` | `ON` | Build the GoogleTest suite (needs GoogleTest). pip builds turn it off. |
+| `BUILD_PYTHON_BINDINGS` | `OFF` | Build the `min_snap._core` pybind11 module. Off by default so `add_subdirectory()` consumers do not need Python headers; `pip install` turns it on. |
 
 ---
 
 ## Quick start
+
+### Python — unconstrained minimum snap (free space)
+
+The minimum-snap control points for given start/end position, velocity and acceleration have a
+closed form, `C = SE @ Q`: one small matrix product, no optimiser. Both clamped and natural
+B-splines are available. `solve_unconstrained` builds `SE` for you. The two solvers order its
+columns differently, and both work in unit-knot time, so `dt` (knot spacing in seconds) rescales
+the derivatives.
+
+```python
+import numpy as np
+from min_snap import MinSnapClamped, MinSnapNatural, TrajectorySampler
+
+dt = 0.5                                   # seconds per knot interval
+solver = MinSnapClamped(num_segments=10)   # or MinSnapNatural(10); degree defaults to 4
+
+C = solver.solve_unconstrained(
+    p0=[0, 0, -2], v0=[1, 0, 0], a0=[0, 0, 0],      # start state (NED)
+    pf=[10, 5, -4], vf=[0, 0, 0], af=[0, 0, 0],     # end state
+    dt=dt)                                          # -> (3, num_control_points)
+
+traj = TrajectorySampler(C, solver.scaled_knots(dt), solver.degree)
+print(traj.duration)                       # 5.0 s  (= num_segments * dt)
+print(traj.position(traj.end_time))        # [10. 5. -4.]
+samples = traj.sample(np.linspace(traj.start_time, traj.end_time, 100))  # (100, 9): pos|vel|acc
+
+# Raw access, if you want to build SE yourself (native column order, unit-knot time):
+Q = solver.get_Q_matrix()                  # (6, N)
+SE = MinSnapClamped.build_SE([0, 0, -2], [1, 0, 0], [0, 0, 0], [10, 5, -4], [0, 0, 0], [0, 0, 0], dt=dt)
+assert np.allclose(SE @ Q, C)
+```
+
+### Python — SFC-constrained planning (obstacle avoidance)
+
+```python
+import numpy as np
+from min_snap import SparseVoxelGrid, ObstacleBox, FrontEndConfig, TrajectoryPlanner
+
+drone_radius = 0.49
+grid = SparseVoxelGrid(resolution=0.5, inflation_radius=drone_radius)
+grid.update_from_obstacles([ObstacleBox(min=[4.5, -0.5, -7.0], max=[5.5, 0.5, 0.0])])  # a pillar
+# or from a sensor:  grid.update_from_scan(sensor_origin, hits)   # hits: (N, 3) array
+
+cfg = FrontEndConfig(voxel_resolution=0.5, drone_physical_radius=drone_radius,
+                     map_bounds=[100.0, 100.0, 15.0], min_altitude=drone_radius + 0.1,
+                     planning_horizon=12.0)
+planner = TrajectoryPlanner(cfg, grid, v_max=3.0, a_max=2.0)
+
+result = planner.plan_mission(start_pos=[0, 0, -3], end_pos=[10, 0, -3],
+                              start_vel=[0, 0, 0], start_acc=[0, 0, 0])
+if result.success:
+    traj = result.sampler()                # de Boor over result.control_points / knots / degree
+    print(result.total_time_ms, result.solve_attempts, len(result.corridors))
+    print(traj.position(traj.end_time))    # ~[10. 0. -3.]
+    pts = result.control_points_xyz        # (N, 3); result.control_points is the flat array
+```
+
+`FrontEndConfig` accepts any field as a keyword (unknown names raise). Every array a binding
+returns is a copy. The grid is shared with the planner (`shared_ptr`), so keep updating it
+between plans and build a fresh planner per replan, as the ROS node does. Calls hold the GIL,
+which serialises map updates against planning across Python threads (the engine itself is not
+thread-safe).
+
+### C++
 
 ```cpp
 #include "trajectory_planner.hpp"
@@ -366,6 +457,19 @@ on each waypoint arrival.
 
 ## Testing
 
+### Python bindings
+
+```bash
+pip install -e ".[test]"
+pytest python/tests                    # or: python python/tests/test_bindings.py
+```
+
+Checks the unconstrained solvers by evaluating the splines: boundary states reproduced at
+several knot spacings, and no boundary-preserving perturbation lowers the snap cost. It also
+plans past obstacles, both from `update_from_obstacles` and from a raycast scan. In a shell with
+ROS sourced, run `env -u PYTHONPATH pytest ...`: ROS's `launch_testing` pytest plugin otherwise
+loads and fails on a missing `yaml`.
+
 ### Unit tests
 
 ```bash
@@ -465,13 +569,16 @@ cpp/                    the C++ engine — this is the production artifact
   tests/                GoogleTest suite
   tools/                stress_planner.cpp
   deps/                 vendored nanoflann
-python/                 original Python prototype the C++ is a port of
+pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
+python/min_snap/        the Python package: bindings to the C++ engine
+python/tests/           binding tests
+python/                 (rest) original Python prototype the C++ is a port of
 eVTOL_BSplines/         general B-spline tooling for eVTOL applications
 rrt-astar_mavsim/       RRT + SFC + B-spline optimisation experiments
 data/                   benchmark outputs
 ```
 
-The Python implementation under `python/` predates the C++ port and remains a useful
+The rest of the Python code under `python/` (everything outside `min_snap/` and `tests/`) predates the C++ port and remains a useful
 reference for the underlying maths — several C++ files are direct ports and say so in their
 header comments. It is **not** kept in sync with the C++ engine.
 
@@ -485,9 +592,9 @@ pip install -r requirements.txt   # for the Python side
 
 Honest list of rough edges, current as of this writing:
 
-- **Python bindings do not compile.** `src/python_bindings.cpp` still calls the old
-  `TrajectoryPlanner(config, obstacles, ...)` signature; the constructor now takes a
-  `shared_ptr<SparseVoxelGrid>`. Build with `-DBUILD_PYTHON_BINDINGS=OFF` until updated.
+- **Python wheels are not yet portable.** `pip install` builds from source and links the
+  system OSQP, so it suits a clone, not PyPI. Publishing needs OSQP vendored or built in, and
+  wheels built with cibuildwheel.
 - **Every plan ends at a full stop.** The terminal boundary condition pins zero velocity and
   acceleration. With a goal beyond `planning_horizon` that stop lands at the horizon rather
   than the goal, which costs average speed.
