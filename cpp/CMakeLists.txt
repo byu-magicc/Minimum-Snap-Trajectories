@@ -127,13 +127,25 @@ if(BUILD_EXAMPLES)
     add_executable(replay_stall tools/replay_stall.cpp)
     target_link_libraries(replay_stall PRIVATE min_snap_engine)
 
-    add_executable(monte_carlo tools/monte_carlo.cpp)
-    target_link_libraries(monte_carlo PRIVATE min_snap_engine)
     # The harness uses the SAME directional gate the vehicle flies (header-only, Eigen + STL
     # only). Scoped to this tool: min_snap_engine must not gain a roscopter dependency -- the
     # dependency runs the other way.
-    target_include_directories(monte_carlo PRIVATE
-        /home/apd915/rosflight_ws/src/roscopter/roscopter/include)
+    #
+    # roscopter is not part of this repo, so the tool is built only when the gate header can
+    # be found; otherwise it is skipped and the rest of the build is unaffected. The default
+    # hint is the usual ROS workspace layout; point elsewhere with
+    #   cmake -DROSCOPTER_INCLUDE_DIR=<path>/roscopter/roscopter/include ..
+    find_path(ROSCOPTER_INCLUDE_DIR navigation/route_gate.hpp
+        HINTS $ENV{HOME}/rosflight_ws/src/roscopter/roscopter/include
+        DOC "roscopter include directory (only needed for tools/monte_carlo.cpp)")
+    if(ROSCOPTER_INCLUDE_DIR)
+        add_executable(monte_carlo tools/monte_carlo.cpp)
+        target_link_libraries(monte_carlo PRIVATE min_snap_engine)
+        target_include_directories(monte_carlo PRIVATE ${ROSCOPTER_INCLUDE_DIR})
+    else()
+        message(STATUS "Skipping monte_carlo: navigation/route_gate.hpp (roscopter) not found. "
+                       "Set -DROSCOPTER_INCLUDE_DIR to build it.")
+    endif()
 
     add_executable(wall_probe tools/wall_probe.cpp)
     target_link_libraries(wall_probe PRIVATE min_snap_engine)
