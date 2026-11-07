@@ -1,0 +1,35 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "min-snap"
+version = "0.1.0"
+description = "Real-time minimum-snap B-spline trajectory generation with Safe Flight Corridors (C++17 engine, Python bindings)"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["numpy"]
+classifiers = [
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Repository = "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
+
+[tool.scikit-build]
+# The C++ project lives in cpp/; the pure-Python half of the package in python/min_snap/.
+cmake.source-dir = "cpp"
+cmake.build-type = "Release"
+wheel.packages = ["python/min_snap"]
+# Persistent build dir so `pip install -e .` rebuilds incrementally instead of from scratch.
+build-dir = "build/{wheel_tag}"
+
+[tool.scikit-build.cmake.define]
+BUILD_PYTHON_BINDINGS = "ON"
+BUILD_TESTS = "OFF"
+BUILD_EXAMPLES = "OFF"

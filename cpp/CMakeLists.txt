@@ -11,8 +11,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Because you installed these natively via apt, CMake will automatically 
 # search your system's /usr/include directories for them.
 find_package(Eigen3 REQUIRED)
-find_package(GTest REQUIRED)
 find_package(osqp REQUIRED)
+
+# GTest is only needed for the unit tests. pip builds (pyproject.toml) turn the tests off so
+# installing the Python package does not require libgtest-dev.
+option(BUILD_TESTS "Build the GoogleTest suite" ON)
+if(BUILD_TESTS)
+    find_package(GTest REQUIRED)
+endif()
 
 # ==========================================
 # 2. BUILD THE MATH ENGINE LIBRARY
@@ -65,6 +71,7 @@ target_link_libraries(min_snap_engine PUBLIC Eigen3::Eigen osqp::osqp)
 # ==========================================
 # 3. BUILD THE GOOGLE TEST SUITE
 # ==========================================
+if(BUILD_TESTS)
 enable_testing()
 
 add_executable(bspline_tests
@@ -97,6 +104,7 @@ target_link_libraries(bspline_tests
 # Make CTest aware of the Google Tests
 include(GoogleTest)
 gtest_discover_tests(bspline_tests)
+endif()
 
 # ==========================================
 # 3b. EXAMPLES
@@ -137,23 +145,56 @@ endif()
 # ==========================================
 # 4. PYTHON BINDINGS (PYBIND11)
 # ==========================================
-# Default OFF: src/python_bindings.cpp still calls the old
-# TrajectoryPlanner(config, obstacles, ...) signature, which was replaced by
-# TrajectoryPlanner(config, shared_ptr<SparseVoxelGrid>, ...). Leaving this ON made the
-# documented `make -j$(nproc)` fail for anyone following the README. Turn it back ON once
-# the bindings are updated.
+# Builds the extension module `min_snap._core` (python/min_snap/ re-exports it).
+#
+#   pip install -e .        -> scikit-build-core turns this ON and installs the module into
+#                              the environment (SKBUILD is defined).
+#   cmake -DBUILD_PYTHON_BINDINGS=ON ..
+#                           -> the module is written straight into python/min_snap/, so
+#                              `PYTHONPATH=python python -c "import min_snap"` works with no
+#                              install step.
+#
+# OFF by default so consumers that pull this directory in with add_subdirectory() (roscopter)
+# do not need Python development headers.
 option(BUILD_PYTHON_BINDINGS "Build Python Bindings" OFF)
 
 if(BUILD_PYTHON_BINDINGS)
-    include(FetchContent)
-    FetchContent_Declare(
-        pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.11.1
-    )
-    FetchContent_MakeAvailable(pybind11)
+    find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
+
+    # Prefer an installed pybind11 (pip's build env, or apt's pybind11-dev); only hit the
+    # network when neither is new enough.
+    #
+    # 2.12 is a hard floor, not a preference: older pybind11 predates NumPy 2, and against a
+    # NumPy 2 runtime its Eigen caster calls a NULL C-API slot -- any NumPy array passed INTO a
+    # binding segfaults (returning arrays still works, so it looks half-functional). Ubuntu
+    # 24.04's pybind11-dev is 2.11.1, so this is the common case, not a corner case.
+    find_package(pybind11 2.12 CONFIG QUIET)
+    if(NOT pybind11_FOUND OR pybind11_VERSION VERSION_LESS 2.12)
+        message(STATUS "pybind11 not found locally -- fetching v2.13.6")
+        include(FetchContent)
+        FetchContent_Declare(
+            pybind11
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG        v2.13.6
+        )
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+    message(STATUS "pybind11 ${pybind11_VERSION}, Python ${Python_VERSION} (${Python_EXECUTABLE})")
 
     pybind11_add_module(min_snap_bindings src/python_bindings.cpp)
-    target_include_directories(min_snap_bindings PUBLIC include)
+    set_target_properties(min_snap_bindings PROPERTIES OUTPUT_NAME _core)
     target_link_libraries(min_snap_bindings PRIVATE min_snap_engine)
+
+    if(SKBUILD)
+        install(TARGETS min_snap_bindings LIBRARY DESTINATION min_snap)
+    else()
+        set(MIN_SNAP_PY_PKG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../python/min_snap)
+        set_target_properties(min_snap_bindings PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY ${MIN_SNAP_PY_PKG_DIR}
+            # multi-config generators (Ninja Multi-Config, Visual Studio) append the config name
+            # unless the per-config variants are set too
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${MIN_SNAP_PY_PKG_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${MIN_SNAP_PY_PKG_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${MIN_SNAP_PY_PKG_DIR})
+    endif()
 endif()

@@ -12,3 +12,7 @@ token.txt
 .vscode/
 cpp/test_solver.cpp
 cpp/test_minvo.py
+# Python bindings: plain-CMake builds write the extension module into the package
+python/min_snap/_core*.so
+*.egg-info/
+.pytest_cache/
