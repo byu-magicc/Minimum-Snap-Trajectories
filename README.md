@@ -1,5 +1,7 @@
 # Minimum-Snap-Trajectories
 
+[![CI](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml)
+
 Real-time minimum-snap trajectory generation for multirotors flying through cluttered,
 partially-unknown environments.
 
