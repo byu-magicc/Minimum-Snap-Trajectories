@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include "optimize.hpp"
-#include <osqp/osqp.h>
+#include <osqp.h>  // not <osqp/osqp.h>: the bundled (build-tree) OSQP has no osqp/ prefix
 #include <iostream>
 #include <stdexcept>
 #include <vector>

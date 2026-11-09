@@ -8,10 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ==========================================
 # 1. FIND REQUIRED LIBRARIES
 # ==========================================
-# Because you installed these natively via apt, CMake will automatically 
-# search your system's /usr/include directories for them.
-find_package(Eigen3 REQUIRED)
-find_package(osqp REQUIRED)
+# Eigen3 and OSQP: system copies when installed, otherwise downloaded and built here.
+# MIN_SNAP_BUNDLED_DEPS=ON always uses the downloaded ones (pip does this). See the module.
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(MinSnapDeps)
 
 # GTest is only needed for the unit tests. pip builds (pyproject.toml) turn the tests off so
 # installing the Python package does not require libgtest-dev.

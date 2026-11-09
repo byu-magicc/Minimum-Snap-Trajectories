@@ -93,14 +93,20 @@ If the planner mysteriously refuses to produce corridors, check these first.
 |---|---|---|
 | CMake | ≥ 3.16 | |
 | C++ compiler | C++17 | |
-| Eigen3 | 3.3+ | `apt install libeigen3-dev` |
-| OSQP | 1.0+ | the QP solver; must be installed (see below) |
+| Eigen3 | 3.3+ | **optional to install**: used if found, otherwise 3.4.0 is downloaded |
+| OSQP | 1.x | the QP solver. **Optional to install**: used if found, otherwise v1.0.0 is downloaded and linked statically |
 | GoogleTest | any | `apt install libgtest-dev` — only for the test suite |
 | nanoflann | bundled | vendored at `cpp/deps/nanoflann.hpp`, nothing to install |
 | pybind11 | ≥ 2.12 | Python bindings only. pip installs it automatically; a CMake build uses an installed one or downloads 2.13.6. **2.11 (Ubuntu 24.04's `pybind11-dev`) is rejected** — it predates NumPy 2 and segfaults on any array argument. |
 | NumPy | any | Python bindings only |
 
-OSQP is not usually packaged; build it from source:
+Nothing beyond CMake, a C/C++ compiler and git has to be installed. When Eigen or OSQP is
+missing, the configure step downloads it into the build tree, which needs network access the
+first time. Set `-DMIN_SNAP_BUNDLED_DEPS=ON` to always use the downloaded copies, even when
+system ones exist. `pip install` does this, so the Python package is self-contained. A system
+install is still worthwhile if another project in the same binary uses Eigen (roscopter does),
+because two Eigen versions in one binary is undefined behaviour. In that case install them and
+leave the option off. To install OSQP system-wide from source:
 
 ```bash
 git clone --recursive https://github.com/osqp/osqp
@@ -141,8 +147,10 @@ pip install -e .            # builds cpp/ with scikit-build-core, installs min_s
 python -c "import min_snap; print(min_snap.__version__)"
 ```
 
-Only Eigen3 and OSQP need to be installed system-wide (see above); pip fetches pybind11,
-scikit-build-core and NumPy, and skips the GoogleTest suite and examples. The compiled build is
+Nothing needs to be installed system-wide besides a C/C++ compiler and git. pip fetches
+pybind11, scikit-build-core, CMake/Ninja if needed, and NumPy. The build downloads Eigen and
+OSQP and links OSQP statically, so the installed module has no runtime library dependencies.
+It also skips the GoogleTest suite and examples. The compiled build is
 kept under `build/` so re-running `pip install -e .` after a C++ change is incremental.
 **Python edits under `python/min_snap/` are live; C++ edits need `pip install -e .` again.**
 
@@ -160,6 +168,7 @@ build can shadow the pip-installed one when `python/` is on `sys.path`.
 
 | Option | Default | Purpose |
 |---|---|---|
+| `MIN_SNAP_BUNDLED_DEPS` | `OFF` | Always download Eigen 3.4.0 / OSQP v1.0.0 instead of using system copies. With `OFF`, only missing ones are downloaded. pip turns it on. |
 | `MIN_SNAP_EIGEN_SAFETY` | `ON` | Turn Eigen bounds assertions into exceptions even in release builds. **Leave this on** — see [Gotchas](#gotchas). |
 | `BUILD_EXAMPLES` | `ON` | Build `examples/`. Kept on by default so CI notices if an example stops compiling. |
 | `BUILD_TESTS` | `ON` | Build the GoogleTest suite (needs GoogleTest). pip builds turn it off. |
@@ -571,6 +580,7 @@ cpp/                    the C++ engine — this is the production artifact
   tests/                GoogleTest suite
   tools/                stress_planner.cpp
   deps/                 vendored nanoflann
+  cmake/                MinSnapDeps.cmake: finds or downloads Eigen + OSQP
 pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
 python/min_snap/        the Python package: bindings to the C++ engine
 python/tests/           binding tests
@@ -594,9 +604,9 @@ pip install -r requirements.txt   # for the Python side
 
 Honest list of rough edges, current as of this writing:
 
-- **Python wheels are not yet portable.** `pip install` builds from source and links the
-  system OSQP, so it suits a clone, not PyPI. Publishing needs OSQP vendored or built in, and
-  wheels built with cibuildwheel.
+- **No prebuilt wheels yet.** `pip install` compiles from source (about a minute, and it needs a
+  compiler and network). The build is already self-contained, so publishing to PyPI is now
+  just a matter of building wheels with cibuildwheel.
 - **Every plan ends at a full stop.** The terminal boundary condition pins zero velocity and
   acceleration. With a goal beyond `planning_horizon` that stop lands at the horizon rather
   than the goal, which costs average speed.

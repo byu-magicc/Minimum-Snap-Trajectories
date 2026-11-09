@@ -33,3 +33,5 @@ build-dir = "build/{wheel_tag}"
 BUILD_PYTHON_BINDINGS = "ON"
 BUILD_TESTS = "OFF"
 BUILD_EXAMPLES = "OFF"
+# Self-contained: download and statically link Eigen + OSQP, ignore system copies.
+MIN_SNAP_BUNDLED_DEPS = "ON"
