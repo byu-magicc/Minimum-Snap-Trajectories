@@ -92,10 +92,10 @@ If the planner mysteriously refuses to produce corridors, check these first.
 | Dependency | Version | Notes |
 |---|---|---|
 | CMake | ≥ 3.16 | |
-| C++ compiler | C++17 | |
+| C/C++ compiler | C++17 | Linux: GCC or Clang. macOS: Xcode Command Line Tools (`xcode-select --install`). Windows: Visual Studio 2019+ or its Build Tools, with the "Desktop development with C++" workload |
 | Eigen3 | 3.3+ | **optional to install**: used if found, otherwise 3.4.0 is downloaded |
 | OSQP | 1.x | the QP solver. **Optional to install**: used if found, otherwise v1.0.0 is downloaded and linked statically |
-| GoogleTest | any | `apt install libgtest-dev` — only for the test suite |
+| GoogleTest | any | only for the test suite; used if found, otherwise 1.15.2 is downloaded |
 | nanoflann | bundled | vendored at `cpp/deps/nanoflann.hpp`, nothing to install |
 | pybind11 | ≥ 2.12 | Python bindings only. pip installs it automatically; a CMake build uses an installed one or downloads 2.13.6. **2.11 (Ubuntu 24.04's `pybind11-dev`) is rejected** — it predates NumPy 2 and segfaults on any array argument. |
 | NumPy | any | Python bindings only |
@@ -507,7 +507,7 @@ g++ -std=c++17 -O0 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
     src/voxel_grid.cpp src/astar_sfc.cpp src/front_end.cpp src/dynamic_sfc.cpp \
     src/static_sfc.cpp src/trajectory_planner.cpp src/optimize.cpp \
     src/min_snap_clamped.cpp src/min_snap_natural.cpp src/matrix_builder.cpp \
-    -Iinclude -I/usr/include/eigen3 -I/usr/local/include -L/usr/local/lib -losqp \
+    -Iinclude -I/usr/include/eigen3 -I/usr/local/include/osqp -L/usr/local/lib -losqp \
     -o /tmp/stress_planner
 
 export LD_LIBRARY_PATH=/usr/local/lib ASAN_OPTIONS=detect_leaks=0
