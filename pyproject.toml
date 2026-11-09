@@ -16,7 +16,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+# Plotting (min_snap.plot). Kept optional so the core package stays light and headless.
+viz = ["matplotlib>=3.5"]
+test = ["pytest", "matplotlib>=3.5"]
 
 [project.urls]
 Repository = "https://github.com/byu-magicc/Minimum-Snap-Trajectories"

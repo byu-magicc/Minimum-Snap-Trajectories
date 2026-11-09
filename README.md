@@ -262,6 +262,31 @@ between plans and build a fresh planner per replan, as the ROS node does. Calls 
 which serialises map updates against planning across Python threads (the engine itself is not
 thread-safe).
 
+### Python — visualization (optional)
+
+`min_snap.plot` draws trajectories and plans with matplotlib, for checking results by eye.
+It is an optional extra, and nothing is plotted unless you call it:
+
+```bash
+pip install "min-snap[viz]"          # or, from a clone: pip install -e ".[viz]"
+```
+
+```python
+import matplotlib.pyplot as plt
+from min_snap.plot import plot_trajectory, plot_profiles, plot_plan
+
+plot_trajectory(C, solver.scaled_knots(dt), solver.degree)  # free space: unconstrained solve, no map
+plot_profiles(C, solver.scaled_knots(dt), solver.degree)    # position / velocity / acceleration vs time
+plot_plan(result, obstacles=boxes, goal=[10, 0, -3])        # planner result: corridors, obstacles, path
+plot_plan(result, grid=grid, view="top")                    # plan view; draws the grid's occupied voxels
+plt.show()
+```
+
+Each function returns the matplotlib Axes or Figure (`ax.figure.savefig("plan.png")`) and
+never calls `plt.show()` itself, so it is safe in scripts and headless jobs. Plots display
+NED as East-North-Up (altitude = −z); pass `frame="raw"` to plot x, y, z unchanged.
+`python/examples/plot_demo.py` renders all of them.
+
 ### C++
 
 ```cpp
@@ -327,6 +352,7 @@ The bindings cover the two planning workflows end to end, not every C++ function
 | `TrajectoryPlanner` | `TrajectoryPlanner` | Constructor, `plan_mission`, `set_previous_path`. |
 | `PlanningResult`, `Corridor` | `PlanningResult`, `sfc::SFCResult` | Plus `control_points_xyz` and `sampler()`. |
 | `TrajectorySampler` | `bspline::TrajectorySampler` | Plus a vectorised `sample(times)`. |
+| `min_snap.plot` | — | Optional matplotlib plots: `plot_trajectory`, `plot_profiles`, `plot_plan` (needs the `viz` extra). |
 
 Not bound: the front-end and optimisation internals (`FrontEndSFC`, `astar_sfc`,
 `matrix_builder`, `optimize`, MINVO builders), `set_front_end_override`, and the
