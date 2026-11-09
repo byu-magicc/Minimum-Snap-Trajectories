@@ -26,6 +26,7 @@ lives in whatever system consumes it.
 - [Gotchas](#gotchas)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
+- [Contributing and support](#contributing-and-support)
 - [License](#license)
 
 ---
@@ -673,6 +674,14 @@ Honest list of rough edges, current as of this writing:
 - **`is_occupied_radius` and the KD-tree cover real obstacles only**, not the unknown
   frontier — deliberate, so trajectory validation is not tripped by unmeasured space.
 - **Not thread-safe.** Serialise map updates against planning.
+
+---
+
+## Contributing and support
+
+Questions, bug reports and pull requests are welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for development setup, conventions and where to ask for help. Participation is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
