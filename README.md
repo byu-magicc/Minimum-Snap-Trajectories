@@ -633,19 +633,15 @@ cpp/                    the C++ engine — this is the production artifact
 pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
 python/min_snap/        the Python package: bindings to the C++ engine
 python/tests/           binding tests
-python/                 (rest) original Python prototype the C++ is a port of
-eVTOL_BSplines/         general B-spline tooling for eVTOL applications
-rrt-astar_mavsim/       RRT + SFC + B-spline optimisation experiments
-data/                   benchmark outputs
+python/examples/        benchmark.py: timing through the Python bindings
 ```
 
-The rest of the Python code under `python/` (everything outside `min_snap/` and `tests/`) predates the C++ port and remains a useful
-reference for the underlying maths — several C++ files are direct ports and say so in their
-header comments. It is **not** kept in sync with the C++ engine.
-
-```bash
-pip install -r requirements.txt   # for the Python side
-```
+The original pure-Python prototype that the C++ engine was ported from, and the `data/`
+benchmark figures, are no longer on `main`. They are preserved on the
+[`legacy/python-prototype`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/tree/legacy/python-prototype)
+branch and the `prototype-archive` tag (`git checkout prototype-archive`). Several C++ files
+are direct ports and say so in their header comments; the prototype is **not** kept in sync
+with the C++ engine.
 
 ---
 
