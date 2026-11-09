@@ -1,7 +1,11 @@
 name: CI
 
-# Builds the C++ engine exactly as the README documents (default CMake options), then runs the
-# GoogleTest suite and the minimal_planner_loop example, on a clean Ubuntu machine.
+# cpp:       the README's build with system dependencies (apt Eigen, OSQP installed from
+#            source), Ubuntu only.
+# cpp-cross: the same default build on Linux, macOS and Windows with nothing preinstalled, so
+#            Eigen, OSQP and GoogleTest are downloaded by the build itself.
+# python:    `pip install .` + pytest on all three OSes, i.e. what a user of the Python
+#            package actually runs (this is also the path PyPI wheels will take).
 
 on:
   push:
@@ -61,3 +65,59 @@ jobs:
 
       - name: Run example
         run: timeout 300 cpp/build/minimal_planner_loop
+
+  cpp-cross:
+    name: C++ build & test (${{ matrix.os }}, bundled deps)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-2022]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+
+      # --config is for multi-config generators (Visual Studio); ignored elsewhere.
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release --output-on-failure --parallel 4
+
+      - name: Run example
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          if [ -f build/Release/minimal_planner_loop.exe ]; then
+            build/Release/minimal_planner_loop.exe
+          else
+            build/minimal_planner_loop
+          fi
+
+  python:
+    name: Python ${{ matrix.python }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-2022]
+        python: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Exactly the user's install. Verbose so a build failure shows the compiler output.
+      - name: pip install
+        run: python -m pip install -v ".[test]"
+
+      - name: Import from outside the repo
+        working-directory: ${{ runner.temp }}
+        run: python -c "import min_snap; print(min_snap.__version__, min_snap.__file__)"
+
+      - name: Tests
+        run: python -m pytest python/tests -v

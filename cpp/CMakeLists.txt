@@ -8,16 +8,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ==========================================
 # 1. FIND REQUIRED LIBRARIES
 # ==========================================
-# Because you installed these natively via apt, CMake will automatically 
-# search your system's /usr/include directories for them.
-find_package(Eigen3 REQUIRED)
-find_package(osqp REQUIRED)
+# Eigen3 and OSQP: system copies when installed, otherwise downloaded and built here.
+# MIN_SNAP_BUNDLED_DEPS=ON always uses the downloaded ones (pip does this). See the module.
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(MinSnapDeps)
 
 # GTest is only needed for the unit tests. pip builds (pyproject.toml) turn the tests off so
 # installing the Python package does not require libgtest-dev.
 option(BUILD_TESTS "Build the GoogleTest suite" ON)
 if(BUILD_TESTS)
-    find_package(GTest REQUIRED)
+    # System GoogleTest if installed (apt libgtest-dev, brew googletest), else download it.
+    # Windows has no standard install, so CI there always takes the download path.
+    find_package(GTest QUIET)
+    if(NOT TARGET GTest::gtest_main)
+        message(STATUS "min_snap: using bundled GoogleTest 1.15.2")
+        include(FetchContent)
+        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+        set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+        # Match the MSVC runtime CMake picks for our own targets (/MD), else LNK2038.
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        FetchContent_Declare(min_snap_googletest
+            URL https://github.com/google/googletest/releases/download/v1.15.2/googletest-1.15.2.tar.gz
+            URL_HASH SHA256=7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926)
+        FetchContent_MakeAvailable(min_snap_googletest)
+    endif()
 endif()
 
 # ==========================================
@@ -61,8 +75,24 @@ set_target_properties(min_snap_engine PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # planning failure. PUBLIC so consumers (roscopter) get the same protection.
 option(MIN_SNAP_EIGEN_SAFETY "Turn Eigen bounds assertions into exceptions in release builds" ON)
 if(MIN_SNAP_EIGEN_SAFETY)
-    target_compile_options(min_snap_engine PUBLIC
-        -include ${CMAKE_CURRENT_SOURCE_DIR}/include/eigen_safety.hpp)
+    # GCC/Clang spell the force-include "-include <file>"; MSVC spells it "/FI<file>".
+    if(MSVC)
+        target_compile_options(min_snap_engine PUBLIC
+            /FI${CMAKE_CURRENT_SOURCE_DIR}/include/eigen_safety.hpp)
+    else()
+        target_compile_options(min_snap_engine PUBLIC
+            -include ${CMAKE_CURRENT_SOURCE_DIR}/include/eigen_safety.hpp)
+    endif()
+endif()
+
+# MSVC specifics. PUBLIC because public headers depend on them.
+#   _USE_MATH_DEFINES : MSVC only defines M_PI (used in astar_sfc.hpp) when this is set.
+#   /bigobj           : the Eigen-heavy translation units exceed MSVC's default section limit.
+#   /utf-8            : sources contain UTF-8 in comments; read them as UTF-8, not the ANSI
+#                       code page.
+if(MSVC)
+    target_compile_definitions(min_snap_engine PUBLIC _USE_MATH_DEFINES)
+    target_compile_options(min_snap_engine PUBLIC /bigobj /utf-8)
 endif()
 
 # Link the Eigen3 math library to your engine

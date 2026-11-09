@@ -12,8 +12,12 @@
 // Build this WITHOUT -DNDEBUG so those assertions are live, and with sanitizers:
 //
 //   g++ -std=c++17 -O0 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
-//       tools/stress_planner.cpp src/*.cpp -Iinclude -I/usr/include/eigen3 \
-//       -I/usr/local/include -L/usr/local/lib -losqp -o stress_planner
+//       tools/stress_planner.cpp $(ls src/*.cpp | grep -v python_bindings) \
+//       -Iinclude -I/usr/include/eigen3 -I/usr/local/include/osqp \
+//       -L/usr/local/lib -losqp -o stress_planner
+//
+// (osqp.h is included without an osqp/ prefix, hence .../include/osqp; python_bindings.cpp
+// needs pybind11 and is excluded.)
 //
 // Run one case per process so a crash isolates rather than ending the sweep:
 //   N=$(./stress_planner --count); for i in $(seq 0 $((N-1))); do ./stress_planner $i; done
