@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <chrono>
 #include <Eigen/Dense>
 #include "astar_sfc.hpp"
 
