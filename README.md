@@ -15,16 +15,18 @@ lives in whatever system consumes it.
 ## Contents
 
 - [How it works](#how-it-works)
-- [Coordinate conventions](#coordinate-conventions-read-this-first)
+- [Coordinate conventions](#coordinate-conventions--read-this-first)
 - [Building](#building)
 - [Quick start](#quick-start)
 - [API reference](#api-reference)
 - [Configuration](#configuration)
 - [Integrating into your own system](#integrating-into-your-own-system)
+- [Benchmarking](#benchmarking)
 - [Testing](#testing)
 - [Gotchas](#gotchas)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
+- [License](#license)
 
 ---
 
@@ -65,6 +67,7 @@ into *exclusive* pools (constrained to one corridor) separated by *bridge* pools
 *p* points constrained to the **intersection** of two adjacent corridors. Every window of
 *p+1* consecutive control points therefore lies wholly within at least one corridor, so
 every curve segment is contained — in continuous time, with no mixed-integer assignment.
+(That is the design. There are known exceptions; see [Known limitations](#known-limitations).)
 
 ---
 
@@ -123,6 +126,15 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ```
 
+The same build on any OS, including Windows, where there is no `make`:
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build cpp/build --config Release --parallel
+```
+
+CI builds and tests this on Linux, macOS and Windows on every pull request.
+
 Produces:
 
 | Artifact | What it is |
@@ -142,9 +154,19 @@ shared one failed at *run* time with garbage. Nothing needs installing or findin
 The engine ships as the `min_snap` Python package. From a clone:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # recommended (system Python is PEP 668-managed)
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e .            # builds cpp/ with scikit-build-core, installs min_snap in editable mode
 python -c "import min_snap; print(min_snap.__version__)"
+```
+
+A venv is recommended (on Ubuntu the system Python refuses `pip install`). Works on Linux,
+macOS and Windows with Python 3.9 or newer; CI runs `pip install` + the test suite on all three
+with Python 3.9 and 3.13. To use it from another project, install into that project's
+environment instead:
+
+```bash
+pip install "min-snap @ git+https://github.com/byu-magicc/Minimum-Snap-Trajectories.git"
 ```
 
 Nothing needs to be installed system-wide besides a C/C++ compiler and git. pip fetches
@@ -171,7 +193,7 @@ build can shadow the pip-installed one when `python/` is on `sys.path`.
 | `MIN_SNAP_BUNDLED_DEPS` | `OFF` | Always download Eigen 3.4.0 / OSQP v1.0.0 instead of using system copies. With `OFF`, only missing ones are downloaded. pip turns it on. |
 | `MIN_SNAP_EIGEN_SAFETY` | `ON` | Turn Eigen bounds assertions into exceptions even in release builds. **Leave this on** — see [Gotchas](#gotchas). |
 | `BUILD_EXAMPLES` | `ON` | Build `examples/`. Kept on by default so CI notices if an example stops compiling. |
-| `BUILD_TESTS` | `ON` | Build the GoogleTest suite (needs GoogleTest). pip builds turn it off. |
+| `BUILD_TESTS` | `ON` | Build the GoogleTest suite (GoogleTest is downloaded if not installed). pip builds turn it off. |
 | `BUILD_PYTHON_BINDINGS` | `OFF` | Build the `min_snap._core` pybind11 module. Off by default so `add_subdirectory()` consumers do not need Python headers; `pip install` turns it on. |
 
 ---
@@ -293,6 +315,24 @@ all produce `success == false`. Hold position and try again next cycle.
 
 ## API reference
 
+### Python (`import min_snap`)
+
+The bindings cover the two planning workflows end to end, not every C++ function:
+
+| Python | C++ | Notes |
+|---|---|---|
+| `MinSnapClamped`, `MinSnapNatural` | `MinSnapEvalClamped`, `MinSnapEvalNatural` | `solve_unconstrained(...)`, `build_SE`, `get_Q_matrix`, `get_W`, `get_knots`, `scaled_knots`, `update_segments`. The full long names are also exported. |
+| `SparseVoxelGrid`, `ObstacleBox` | `mapping::SparseVoxelGrid`, `mapping::ObstacleBox` | Map updates and state queries. Queries take **world points** (metres), not cell indices. |
+| `FrontEndConfig` | `FrontEndConfig` | Every field; also accepts keyword arguments. |
+| `TrajectoryPlanner` | `TrajectoryPlanner` | Constructor, `plan_mission`, `set_previous_path`. |
+| `PlanningResult`, `Corridor` | `PlanningResult`, `sfc::SFCResult` | Plus `control_points_xyz` and `sampler()`. |
+| `TrajectorySampler` | `bspline::TrajectorySampler` | Plus a vectorised `sample(times)`. |
+
+Not bound: the front-end and optimisation internals (`FrontEndSFC`, `astar_sfc`,
+`matrix_builder`, `optimize`, MINVO builders), `set_front_end_override`, and the
+`trajectory_metrics.hpp` helpers. Use C++ for those, or add them to
+`cpp/src/python_bindings.cpp`.
+
 ### `mapping::SparseVoxelGrid`
 
 The occupancy map. Thread-compatible but **not** thread-safe — serialise access, or run
@@ -306,7 +346,7 @@ sensor updates and planning on the same executor thread.
 | `set_frontier_radius(r)` / `set_frontier_focus(centre, r)` | Scope frontier extraction. Cost scales with the cube of the radius. |
 | `is_free / is_unknown / is_occupied_inflated / is_occupied_raw` | O(1) cell queries. |
 | `is_occupied_radius(pt, r)` | KD-tree query — is anything solid within `r` of this point? Useful for validating a buffered trajectory. |
-| `get_unknown_frontier()` | UNKNOWN cells adjacent to FREE — the boundary corridors must not cross. Computed lazily and cached. |
+| `get_unknown_frontier()` | UNKNOWN cells adjacent to FREE. Computed lazily and cached. **Not** fed to the corridor builder by default (`set_frontier_blocks_corridors(true)` turns that back on); unknown space is handled by A*'s `unknown_traversal_cost` instead. |
 
 ### `TrajectoryPlanner`
 
@@ -337,6 +377,7 @@ that.
 | `total_control_points` | Control-point count. Duration in seconds is `total_control_points - degree`. |
 | `sfc_time_ms`, `opt_time_ms`, `matrix_time_ms`, `overhead_ms`, `total_time_ms` | Per-stage timings. `opt_time_ms` is summed across retries. |
 | `solve_attempts` | > 1 means the trajectory was re-sized and re-solved. |
+| `d_free_ahead`, `terminal_speed` | Measured-free run-out past the last corridor, and the end speed the braking bound allows from it. |
 
 ---
 
@@ -363,9 +404,10 @@ All fields of `FrontEndConfig`, with defaults:
 | Field | Default | Notes |
 |---|---|---|
 | `time_budget_factor` | 1.20 | Slack on the initial flight-time budget. The ideal straight-line time is systematically short once the trajectory must also curve and stop, so the first solve fails and the retry loop lengthens it — and added control points **are** flight time, permanently. Measured over 12 scenarios: 1.00 → 30% first-attempt success, 8.5 ms mean solve; 1.20 → 60% and 5.8 ms. |
-| `astar_max_nodes` | 6000 | Deterministic cap on A* expansions. Keeps planning reproducible; see [Gotchas](#gotchas). |
-| `planning_horizon` | 10.0 | How far ahead A* searches (m). **The single most influential parameter** — see [Gotchas](#gotchas). |
-| `unknown_traversal_cost` | 2.0 | Extra cost multiplier per step through UNKNOWN. `0` treats unknown as free (unsafe); negative hard-blocks it (cannot route around corners). |
+| `astar_max_nodes` | 3000 | Deterministic cap on A* expansions. Keeps planning reproducible; see [Gotchas](#gotchas). |
+| `astar_max_time_ms` | 25.0 | Wall-clock backstop for pathological searches only; the node cap is what normally binds. |
+| `planning_horizon` | 12.0 | How far ahead A* searches (m). **The single most influential parameter** — see [Gotchas](#gotchas). |
+| `unknown_traversal_cost` | 0.5 | Extra cost per step through UNKNOWN. `0` treats unknown as free (unsafe); negative hard-blocks it (cannot route around corners). Keep `1 + unknown_traversal_cost + astar_clearance_cost < 2.0`, or A* stops preferring the goal and floods outward (the old default of 2.0 did exactly that). |
 | `sensor_range` | -1.0 | Search radius cap (m), -1 disables. |
 | `fov_vertical_min/max` | -7 / 52 | Parsed and passed but **no longer gate anything** — unknown-space cost subsumed the old FOV gate. |
 
@@ -375,7 +417,9 @@ All fields of `FrontEndConfig`, with defaults:
 | `degree` | 4 | Spline degree. Minimum snap requires ≥ 4. |
 | `spline_type` | "clamped" | `"clamped"` or `"natural"`. |
 | `aircraft_type` | "multi-rotor" | `"multi-rotor"` or `"fixed-wing"` (different corridor and allocation strategies). |
-| `v_max`, `a_max` | 3.0 / 2.0 | Kinematic limits. `TrajectoryPlanner` overwrites these from its own constructor arguments, so set them there. |
+| `v_max`, `a_max` | 3.0 / 2.0 | Kinematic limits. `TrajectoryPlanner` overwrites these from its own constructor arguments, so set them there. Enforced **per axis** by default; see `enforce_norm_limits`. |
+| `enforce_norm_limits` | false | `false`: each of `abs(v_x)`, `abs(v_y)`, `abs(v_z)` is `≤ v_max`, so speed can reach `√3·v_max` (likewise for acceleration). `true`: shrinks the box so speed really is `≤ v_max`, at the cost of more refusals on long paths. |
+| `max_solve_time_ms` | 60.0 | Wall-clock cap on the OSQP retry loop. A failing solve burns the full iteration budget, so this keeps a doomed plan from overrunning the replan period. 0 disables. |
 
 ---
 
@@ -484,14 +528,11 @@ loads and fails on a missing `yaml`.
 ### Unit tests
 
 ```bash
-cd cpp/build
-make bspline_tests -j$(nproc)
-ctest --output-on-failure
+cmake --build cpp/build --config Release --target bspline_tests --parallel
+ctest --test-dir cpp/build -C Release --output-on-failure
 ```
 
-(The engine is statically linked, so there is no shared-library path to get wrong. If you
-are working from an older checkout where it was built `SHARED`, you may still need
-`LD_LIBRARY_PATH=$PWD` to avoid picking up a stale copy from elsewhere.)
+The engine is statically linked, so there is no shared-library path to get wrong.
 
 ### Stress / edge-case sweep
 
@@ -549,11 +590,16 @@ points, ~65 ms. Longer horizons also produce more convoluted paths. Start short.
 seconds is `total_control_points - degree`. Adding control points for resolution also adds
 flight time; there is currently no way to decouple them.
 
+**`v_max` is a per-axis limit unless you ask otherwise.** With the default
+`enforce_norm_limits = false` a diagonal trajectory can legitimately fly at up to
+`√3 · v_max`. Set it to `true` if `v_max` must be a true speed limit.
+
 **Planning is deterministic — keep it that way.** A*'s budget is a node count
 (`astar_max_nodes`), not a wall-clock timer, so identical inputs give identical trajectories.
 This matters more than it sounds: when the budget was time-based, the same scenario reached
 the goal on some runs and stranded the vehicle on others, purely from CPU scheduling jitter.
-A wall-clock backstop still exists for pathological cases and logs loudly when it fires.
+A wall-clock backstop (`astar_max_time_ms`) still exists for pathological cases and logs
+loudly when it fires.
 
 **A detour longer than `planning_horizon` can strand the vehicle.** The horizon-projected
 goal points into the obstacle and the search never sees the way around. Raising the horizon
@@ -574,11 +620,14 @@ below that margin. Measure it.
 ## Repository layout
 
 ```
+LICENSE                 BSD 3-Clause
+.github/workflows/      CI: C++ and Python builds/tests on Linux, macOS, Windows
 cpp/                    the C++ engine — this is the production artifact
   include/              public headers
-  src/                  implementation
+  src/                  implementation (python_bindings.cpp is the pybind11 module)
   tests/                GoogleTest suite
-  tools/                stress_planner.cpp
+  examples/             minimal_planner_loop.cpp
+  tools/                stress_planner, replay/repro tools, monte_carlo (needs roscopter)
   deps/                 vendored nanoflann
   cmake/                MinSnapDeps.cmake: finds or downloads Eigen + OSQP
 pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
@@ -610,9 +659,23 @@ Honest list of rough edges, current as of this writing:
 - **Every plan ends at a full stop.** The terminal boundary condition pins zero velocity and
   acceleration. With a goal beyond `planning_horizon` that stop lands at the horizon rather
   than the goal, which costs average speed.
+- **Corridor containment has known exceptions.** (1) Control points pinned by a start
+  velocity that points out of the first corridor are not corridor-constrained, so the opening
+  span can leave it (measured: 2.3 cm). (2) Some allocations leave a *(degree+1)*-window of
+  control points in no single corridor (measured: curve 4.5 mm outside the union). Obstacle
+  clearance held in every case observed, but the corridor chain is not a strict certificate.
+  `python/tests/test_bindings.py` reports the excursion per plan.
+- **Wide obstacles dead ahead can be infeasible.** A 3 m-wide pillar directly on the path
+  fails to plan: A* hugs it and the flanking corridors come out ~0.1 m wide.
 - **Some geometries are genuinely infeasible** and the QP correctly refuses, taking tens of
   milliseconds to do so. Refusals are handled (the caller holds position), but they are not
   rare.
 - **`is_occupied_radius` and the KD-tree cover real obstacles only**, not the unknown
   frontier — deliberate, so trajectory validation is not tripped by unmeasured space.
 - **Not thread-safe.** Serialise map updates against planning.
+
+---
+
+## License
+
+BSD 3-Clause; see [`LICENSE`](LICENSE). Copyright (c) 2026, BYU MAGICC Lab.
