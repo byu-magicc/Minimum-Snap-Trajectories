@@ -1,7 +1,7 @@
 """Benchmark the C++ engine through the `min_snap` Python bindings.
 
     pip install -e .            (from the repo root), then
-    python python/benchmark_python.py
+    python python/examples/benchmark.py
 
 1. Unconstrained minimum snap (clamped and natural): Python-side cost of one C = SE @ Q solve.
 2. SFC-constrained planning on the floating-blocks scene from

@@ -53,6 +53,13 @@ The first release, 0.1.0, will be cut from this section.
 - README brought up to date: corrected defaults, Python API reference, cross-platform
   build commands, known limitations. (#8)
 
+### Removed
+
+- The original pure-Python prototype, the `data/` benchmark figures and `requirements.txt`
+  are no longer on `main`. They are preserved on the `legacy/python-prototype` branch and
+  the `prototype-archive` tag. The bindings benchmark moved to
+  `python/examples/benchmark.py`. (#22)
+
 ### Fixed
 
 - The default CMake build no longer fails on machines without roscopter: `monte_carlo`, which
