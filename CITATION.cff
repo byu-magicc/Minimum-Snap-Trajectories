@@ -9,10 +9,18 @@ abstract: >-
   engine with Python bindings.
 type: software
 authors:
-  - given-names: TODO
-    family-names: TODO
-    orcid: "https://orcid.org/0000-0000-0000-0000"
-    affiliation: "TODO e.g. MAGICC Lab, Brigham Young University"
+  - given-names: Alejandro
+    family-names: Pelaez
+    orcid: "https://orcid.org/0009-0009-0848-4365"
+    affiliation: "MAGICC Lab, Brigham Young University"
+  - given-names: Brady
+    family-names: Moon
+    orcid: "https://orcid.org/0000-0003-4297-3938"
+    affiliation: "FROST Lab, Brigham Young University"
+  - given-names: Randal
+    family-names: Beard
+    orcid: "https://orcid.org/0000-0002-2548-5329"
+    affiliation: "MAGICC Lab, Brigham Young University"
 license: BSD-3-Clause
 repository-code: "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
 version: 0.1.0
