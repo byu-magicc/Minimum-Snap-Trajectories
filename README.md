@@ -26,6 +26,7 @@ lives in whatever system consumes it.
 - [Gotchas](#gotchas)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
+- [Citing](#citing)
 - [License](#license)
 
 ---
@@ -697,6 +698,17 @@ Honest list of rough edges, current as of this writing:
 - **`is_occupied_radius` and the KD-tree cover real obstacles only**, not the unknown
   frontier — deliberate, so trajectory validation is not tripped by unmeasured space.
 - **Not thread-safe.** Serialise map updates against planning.
+
+---
+
+## Citing
+
+If you use this software in research, please cite it. Citation metadata is in
+[`CITATION.cff`](CITATION.cff); GitHub's "Cite this repository" button generates BibTeX and APA
+from it.
+
+<!-- TODO (authors, #15): add the BibTeX for the ACC paper / arXiv preprint here, and the JOSS
+     paper after acceptance. -->
 
 ---
 
