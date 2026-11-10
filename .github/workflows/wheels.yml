@@ -1,0 +1,130 @@
+name: Wheels
+
+# Builds the binary wheels (and the source distribution) that `pip install min-snap` will
+# download from PyPI, tests every wheel in a clean environment, and publishes them.
+#
+#   pull requests:  one Python version per platform, as a quick check that packaging works
+#   push to main, manual run, release:  every supported Python version
+#
+# Publishing (needs trusted publishing configured on PyPI / TestPyPI, see RELEASING.md):
+#   - TestPyPI: run this workflow manually with "publish to TestPyPI" ticked
+#   - PyPI:     publish a GitHub release
+# Until then, the wheels are still downloadable from each run's "Artifacts" section.
+
+on:
+  pull_request:
+    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', '.github/workflows/wheels.yml']
+  push:
+    branches: [main]
+    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', '.github/workflows/wheels.yml']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      publish_testpypi:
+        description: Publish the built distributions to TestPyPI
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build_wheels:
+    name: Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux-x86_64
+            runs-on: ubuntu-24.04
+          - os: linux-aarch64
+            runs-on: ubuntu-24.04-arm
+          - os: windows-amd64
+            runs-on: windows-2022
+          - os: macos-x86_64
+            runs-on: macos-15-intel   # last Intel macOS runner
+          - os: macos-arm64
+            runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build and test wheels
+        uses: pypa/cibuildwheel@v4.3.5
+        env:
+          # Quick check on PRs; everything otherwise (pyproject.toml [tool.cibuildwheel] applies).
+          CIBW_BUILD: ${{ github.event_name == 'pull_request' && 'cp313-*' || 'cp*' }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Source distribution
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      # The sdist is what pip falls back to on platforms without a wheel, so check that it
+      # builds and passes the tests on its own.
+      - name: Install from sdist and test
+        run: |
+          python -m venv /tmp/sdist-venv
+          /tmp/sdist-venv/bin/pip install "$(ls dist/*.tar.gz)[test]"
+          cd /tmp && /tmp/sdist-venv/bin/python -m pytest "$GITHUB_WORKSPACE/python/tests" -q
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-sdist
+          path: dist/*.tar.gz
+
+  publish_testpypi:
+    name: Publish to TestPyPI
+    needs: [build_wheels, build_sdist]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_testpypi
+    runs-on: ubuntu-24.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/min-snap
+    permissions:
+      id-token: write   # trusted publishing: no API token stored anywhere
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish_pypi:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/min-snap
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
