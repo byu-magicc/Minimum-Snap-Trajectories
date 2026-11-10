@@ -516,6 +516,11 @@ fields as keyword arguments: FrontEndConfig(v_max=4.0, planning_horizon=15.0).
             R << r.ux, r.uy, r.uz;
             return R;
         }, "3x3 matrix whose columns are the local frame unit vectors ux, uy, uz.")
+        .def_property_readonly("vertices", [](const sfc::SFCResult& r) {
+            Eigen::Matrix<double, 8, 3, Eigen::RowMajor> v = r.getAllVertices_3D().transpose();
+            return v;
+        }, "(8, 3) corners of the oriented box: indices 0-3 are the bottom face (local -z) in "
+           "order, 4-7 the top face; vertex i+4 sits above vertex i.")
         .def("contains", [](const sfc::SFCResult& r, const Vector3d& p, double tol) {
             return ((r.A_mat * p - r.b_vec).array() <= tol).all();
         }, py::arg("point"), py::arg("tol") = 1e-9);

@@ -37,6 +37,10 @@ The first release, 0.1.0, will be cut from this section.
   unconstrained solvers, the voxel grid, `FrontEndConfig`, `TrajectoryPlanner`,
   `PlanningResult` (with its corridors) and `TrajectorySampler`. A test suite checks boundary
   states and minimum-snap optimality by evaluating the splines. (#2)
+- **Optional plotting module `min_snap.plot`** (`pip install "min-snap[viz]"`):
+  `plot_trajectory`, `plot_profiles` and `plot_plan` for trajectories, derivative profiles
+  and plans with their corridors and obstacles. Python `Corridor` objects gain `vertices`.
+  (#27)
 - **Continuous integration** on Linux, macOS and Windows: C++ build, tests and example, plus
   `pip install` and pytest on Python 3.9 and 3.13. (#3, #7)
 - **Dependency bundling:** Eigen 3.4.0, OSQP v1.0.0 and GoogleTest 1.15.2 are downloaded when
