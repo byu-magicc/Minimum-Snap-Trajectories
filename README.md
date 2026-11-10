@@ -622,6 +622,8 @@ below that margin. Measure it.
 
 ```
 LICENSE                 BSD 3-Clause
+CHANGELOG.md            notable changes per release (Keep a Changelog)
+RELEASING.md            how to cut a release
 .github/workflows/      CI: C++ and Python builds/tests on Linux, macOS, Windows
 cpp/                    the C++ engine — this is the production artifact
   include/              public headers

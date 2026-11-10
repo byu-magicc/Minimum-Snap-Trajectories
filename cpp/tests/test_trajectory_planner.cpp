@@ -56,6 +56,10 @@ TEST(TrajectoryPlannerTest, ClampedFullPipeline) {
     config.aircraft_type = "multi-rotor";
     config.degree = 4;
     config.map_bounds = Eigen::Vector3d(100.0, 100.0, 15.0);
+    // Disable the wall-clock solve budget. It is a real-time safeguard for flight; in a
+    // test it makes the outcome depend on runner speed (a 147 ms first attempt on a loaded
+    // Windows CI runner bailed before the retry that succeeds everywhere else).
+    config.max_solve_time_ms = 0.0;
 
     auto obstacles = build_test_obstacles();
     auto grid = std::make_shared<mapping::SparseVoxelGrid>(config.voxel_resolution, config.drone_physical_radius);
@@ -97,6 +101,10 @@ TEST(TrajectoryPlannerTest, EmptyMapNatural) {
     config.aircraft_type = "multi-rotor";
     config.degree = 4;
     config.map_bounds = Eigen::Vector3d(50.0, 50.0, 15.0);
+    // Disable the wall-clock solve budget. It is a real-time safeguard for flight; in a
+    // test it makes the outcome depend on runner speed (a 147 ms first attempt on a loaded
+    // Windows CI runner bailed before the retry that succeeds everywhere else).
+    config.max_solve_time_ms = 0.0;
 
     std::vector<mapping::ObstacleBox> no_obstacles;
     auto grid = std::make_shared<mapping::SparseVoxelGrid>(config.voxel_resolution, config.drone_physical_radius);
@@ -128,6 +136,10 @@ TEST(TrajectoryPlannerTest, FloatingBlocksBenchmark) {
     config.aircraft_type = "fixed-wing";
     config.degree = 4;
     config.map_bounds = Eigen::Vector3d(100.0, 100.0, 15.0);
+    // Disable the wall-clock solve budget. It is a real-time safeguard for flight; in a
+    // test it makes the outcome depend on runner speed (a 147 ms first attempt on a loaded
+    // Windows CI runner bailed before the retry that succeeds everywhere else).
+    config.max_solve_time_ms = 0.0;
 
     // Build floating blocks
     std::vector<mapping::ObstacleBox> obstacles;
