@@ -12,16 +12,21 @@ tags:
   - quadrotors
   - B-splines
 authors:
-  - name: TODO First Last
-    orcid: 0000-0000-0000-0000   # TODO
+  - name: Alejandro Pelaez
+    orcid: 0009-0009-0848-4365   
     affiliation: 1
     corresponding: true
-  - name: TODO Co-author        # every co-author must agree to be listed (#10)
-    orcid: 0000-0000-0000-0000   # TODO
+  - name: Brady Moon        
+    orcid: 0000-0003-4297-3938   
+    affiliation: 2
+  - name: Randal Beard
+    orcid: 0000-0002-2548-5329  
     affiliation: 1
 affiliations:
-  - name: TODO e.g. MAGICC Lab, Brigham Young University, United States
+  - name: MAGICC Lab, Brigham Young University, United States
     index: 1
+  - name: FROST Lab, Brigham Young University, United States
+    index: 2
 date: TODO 1 January 2027
 bibliography: paper.bib
 ---
