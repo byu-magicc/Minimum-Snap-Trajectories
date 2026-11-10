@@ -661,7 +661,7 @@ cpp/                    the C++ engine — this is the production artifact
 pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
 python/min_snap/        the Python package: bindings to the C++ engine
 python/tests/           binding tests
-python/examples/        benchmark.py: timing through the Python bindings
+python/examples/        benchmark.py (timing), plot_demo.py (visualization)
 ```
 
 The original pure-Python prototype that the C++ engine was ported from, and the `data/`
