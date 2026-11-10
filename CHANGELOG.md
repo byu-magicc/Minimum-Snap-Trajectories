@@ -43,6 +43,8 @@ The first release, 0.1.0, will be cut from this section.
   not installed. `MIN_SNAP_BUNDLED_DEPS=ON` always downloads them, and pip builds use it, so
   the Python package needs only a compiler and git. (#7)
 - BSD 3-Clause license.
+- Contributing guide, code of conduct (Contributor Covenant 2.1), and issue and
+  pull-request templates. (#24)
 
 ### Changed
 
