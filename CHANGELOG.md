@@ -51,6 +51,8 @@ The first release, 0.1.0, will be cut from this section.
   not installed. `MIN_SNAP_BUNDLED_DEPS=ON` always downloads them, and pip builds use it, so
   the Python package needs only a compiler and git. (#7)
 - BSD 3-Clause license.
+- `CITATION.cff` with authors and ORCIDs (GitHub's "Cite this repository" button; read by
+  Zenodo for release DOIs), and a Citing section in the README. (#15)
 
 ### Changed
 
