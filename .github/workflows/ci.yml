@@ -117,7 +117,7 @@ jobs:
 
       - name: Import from outside the repo
         working-directory: ${{ runner.temp }}
-        run: python -c "import min_snap; print(min_snap.__version__, min_snap.__file__)"
+        run: python -c "import coast_planner; print(coast_planner.__version__, coast_planner.__file__)"
 
       - name: Tests
         run: python -m pytest python/tests -v

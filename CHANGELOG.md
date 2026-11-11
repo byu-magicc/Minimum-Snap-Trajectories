@@ -37,11 +37,11 @@ The first release, 0.1.0, will be cut from this section.
   assertions throw instead of corrupting memory (`MIN_SNAP_EIGEN_SAFETY`, on by default).
 - **Tools:** `minimal_planner_loop` example, stress sweep (`stress_planner`), QP-failure replay
   tools, and probes for walls and `v_max`.
-- **Python package `min_snap`** (pybind11), installable with `pip install`. It covers the
+- **Python package `coast_planner`** (pybind11), installable with `pip install`. It covers the
   unconstrained solvers, the voxel grid, `FrontEndConfig`, `TrajectoryPlanner`,
   `PlanningResult` (with its corridors) and `TrajectorySampler`. A test suite checks boundary
   states and minimum-snap optimality by evaluating the splines. (#2)
-- **Optional plotting module `min_snap.plot`** (`pip install "min-snap[viz]"`):
+- **Optional plotting module `coast_planner.plot`** (`pip install "coast-planner[viz]"`):
   `plot_trajectory`, `plot_profiles` and `plot_plan` for trajectories, derivative profiles
   and plans with their corridors and obstacles. Python `Corridor` objects gain `vertices`.
   (#27)
@@ -54,6 +54,10 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Changed
 
+- **Renamed the Python package to COAST's name:** install with `pip install coast-planner`,
+  import as `coast_planner` (previously `min-snap` / `min_snap`, never published). The C++
+  library target `min_snap_engine` and the `MIN_SNAP_*` CMake options are unchanged, so C++
+  consumers such as roscopter are unaffected.
 - Python packaging metadata for PyPI: SPDX license expression (BSD-3-Clause), keywords,
   classifiers and project URLs; `requires-python` raised to 3.9 (3.8 is end-of-life and was
   never tested). (#17)

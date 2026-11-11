@@ -1,11 +1,12 @@
-"""Python interface to the C++ minimum-snap B-spline trajectory engine.
+"""COAST (Corridor-Optimized Aerially-Safe Trajectories): Python interface to the C++
+minimum-snap B-spline trajectory planner.
 
 Two planning paradigms:
 
 Unconstrained (free space, closed form, C = SE @ Q)::
 
     import numpy as np
-    from min_snap import MinSnapClamped, TrajectorySampler
+    from coast_planner import MinSnapClamped, TrajectorySampler
 
     solver = MinSnapClamped(num_segments=10)
     C = solver.solve_unconstrained(p0=[0, 0, 0], v0=[0, 0, 0], a0=[0, 0, 0],
@@ -14,7 +15,7 @@ Unconstrained (free space, closed form, C = SE @ Q)::
 
 SFC-constrained (obstacle avoidance through Safe Flight Corridors)::
 
-    from min_snap import SparseVoxelGrid, ObstacleBox, FrontEndConfig, TrajectoryPlanner
+    from coast_planner import SparseVoxelGrid, ObstacleBox, FrontEndConfig, TrajectoryPlanner
 
     grid = SparseVoxelGrid(resolution=0.5, inflation_radius=0.5)
     grid.update_from_obstacles([ObstacleBox([4, -2, -6], [6, 2, 0])])
@@ -44,7 +45,7 @@ try:
     from importlib.metadata import PackageNotFoundError, version as _version
 
     try:
-        __version__ = _version("min-snap")
+        __version__ = _version("coast-planner")
     except PackageNotFoundError:  # imported from a plain CMake build, not pip-installed
         __version__ = "0.0.0+local"
 except ImportError:  # pragma: no cover

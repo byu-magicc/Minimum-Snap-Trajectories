@@ -1,8 +1,8 @@
-"""Optional matplotlib visualisation for min_snap trajectories and plans.
+"""Optional matplotlib visualisation for coast_planner trajectories and plans.
 
 Install the extra first::
 
-    pip install "min-snap[viz]"
+    pip install "coast-planner[viz]"
 
 Nothing here is called by the planner: plots are only made when you ask for them, and no
 function calls ``plt.show()``. Each returns the matplotlib Axes or Figure, so you can save it
@@ -39,7 +39,7 @@ def _plt():
         import matplotlib.pyplot as plt
     except ImportError as e:  # pragma: no cover - exercised only without matplotlib
         raise ImportError(
-            'min_snap.plot needs matplotlib. Install it with: pip install "min-snap[viz]"'
+            'coast_planner.plot needs matplotlib. Install it with: pip install "coast-planner[viz]"'
         ) from e
     return plt
 

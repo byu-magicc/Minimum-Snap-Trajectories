@@ -1,9 +1,17 @@
-# Minimum-Snap-Trajectories
+# COAST: Corridor-Optimized Aerially-Safe Trajectories
 
 [![CI](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml)
 
 Real-time minimum-snap trajectory generation for multirotors flying through cluttered,
-partially-unknown environments.
+partially-unknown environments. This repository is the implementation of the **COAST** planner:
+an A\* front end that builds Safe Flight Corridors, and a quadratic-programming back end that
+optimises snap-minimised B-spline control points inside them, with MINVO kinodynamic bounds.
+
+```bash
+pip install coast-planner        # Python package; `import coast_planner` (on PyPI from v0.1.0)
+```
+
+Until the first PyPI release, install from GitHub instead; see [Python package](#python-package).
 
 Given a start state, a goal, and a stream of LiDAR returns, the planner produces a
 collision-free B-spline trajectory — typically in **5–20 ms**, fast enough to re-plan at
@@ -151,13 +159,13 @@ shared one failed at *run* time with garbage. Nothing needs installing or findin
 
 ### Python package
 
-The engine ships as the `min_snap` Python package. From a clone:
+The engine ships as the `coast_planner` Python package. From a clone:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .            # builds cpp/ with scikit-build-core, installs min_snap in editable mode
-python -c "import min_snap; print(min_snap.__version__)"
+pip install -e .            # builds cpp/ with scikit-build-core, installs coast_planner in editable mode
+python -c "import coast_planner; print(coast_planner.__version__)"
 ```
 
 A venv is recommended (on Ubuntu the system Python refuses `pip install`). Works on Linux,
@@ -166,7 +174,7 @@ with Python 3.9 and 3.13. To use it from another project, install into that proj
 environment instead:
 
 ```bash
-pip install "min-snap @ git+https://github.com/byu-magicc/Minimum-Snap-Trajectories.git"
+pip install "coast-planner @ git+https://github.com/byu-magicc/Minimum-Snap-Trajectories.git"
 ```
 
 Nothing needs to be installed system-wide besides a C/C++ compiler and git. pip fetches
@@ -174,16 +182,16 @@ pybind11, scikit-build-core, CMake/Ninja if needed, and NumPy. The build downloa
 OSQP and links OSQP statically, so the installed module has no runtime library dependencies.
 It also skips the GoogleTest suite and examples. The compiled build is
 kept under `build/` so re-running `pip install -e .` after a C++ change is incremental.
-**Python edits under `python/min_snap/` are live; C++ edits need `pip install -e .` again.**
+**Python edits under `python/coast_planner/` are live; C++ edits need `pip install -e .` again.**
 
 Without pip, a plain CMake build writes the extension module straight into the package:
 
 ```bash
 cd cpp/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON && make -j$(nproc) min_snap_bindings
-cd ../.. && PYTHONPATH=python python -c "import min_snap"
+cd ../.. && PYTHONPATH=python python -c "import coast_planner"
 ```
 
-Don't mix the two in one environment: a `_core*.so` left in `python/min_snap/` by a CMake
+Don't mix the two in one environment: a `_core*.so` left in `python/coast_planner/` by a CMake
 build can shadow the pip-installed one when `python/` is on `sys.path`.
 
 ### CMake options
@@ -194,7 +202,7 @@ build can shadow the pip-installed one when `python/` is on `sys.path`.
 | `MIN_SNAP_EIGEN_SAFETY` | `ON` | Turn Eigen bounds assertions into exceptions even in release builds. **Leave this on** — see [Gotchas](#gotchas). |
 | `BUILD_EXAMPLES` | `ON` | Build `examples/`. Kept on by default so CI notices if an example stops compiling. |
 | `BUILD_TESTS` | `ON` | Build the GoogleTest suite (GoogleTest is downloaded if not installed). pip builds turn it off. |
-| `BUILD_PYTHON_BINDINGS` | `OFF` | Build the `min_snap._core` pybind11 module. Off by default so `add_subdirectory()` consumers do not need Python headers; `pip install` turns it on. |
+| `BUILD_PYTHON_BINDINGS` | `OFF` | Build the `coast_planner._core` pybind11 module. Off by default so `add_subdirectory()` consumers do not need Python headers; `pip install` turns it on. |
 
 ---
 
@@ -210,7 +218,7 @@ the derivatives.
 
 ```python
 import numpy as np
-from min_snap import MinSnapClamped, MinSnapNatural, TrajectorySampler
+from coast_planner import MinSnapClamped, MinSnapNatural, TrajectorySampler
 
 dt = 0.5                                   # seconds per knot interval
 solver = MinSnapClamped(num_segments=10)   # or MinSnapNatural(10); degree defaults to 4
@@ -235,7 +243,7 @@ assert np.allclose(SE @ Q, C)
 
 ```python
 import numpy as np
-from min_snap import SparseVoxelGrid, ObstacleBox, FrontEndConfig, TrajectoryPlanner
+from coast_planner import SparseVoxelGrid, ObstacleBox, FrontEndConfig, TrajectoryPlanner
 
 drone_radius = 0.49
 grid = SparseVoxelGrid(resolution=0.5, inflation_radius=drone_radius)
@@ -264,16 +272,16 @@ thread-safe).
 
 ### Python — visualization (optional)
 
-`min_snap.plot` draws trajectories and plans with matplotlib, for checking results by eye.
+`coast_planner.plot` draws trajectories and plans with matplotlib, for checking results by eye.
 It is an optional extra, and nothing is plotted unless you call it:
 
 ```bash
-pip install "min-snap[viz]"          # or, from a clone: pip install -e ".[viz]"
+pip install "coast-planner[viz]"          # or, from a clone: pip install -e ".[viz]"
 ```
 
 ```python
 import matplotlib.pyplot as plt
-from min_snap.plot import plot_trajectory, plot_profiles, plot_plan
+from coast_planner.plot import plot_trajectory, plot_profiles, plot_plan
 
 plot_trajectory(C, solver.scaled_knots(dt), solver.degree)  # free space: unconstrained solve, no map
 plot_profiles(C, solver.scaled_knots(dt), solver.degree)    # position / velocity / acceleration vs time
@@ -340,7 +348,7 @@ all produce `success == false`. Hold position and try again next cycle.
 
 ## API reference
 
-### Python (`import min_snap`)
+### Python (`import coast_planner`)
 
 The bindings cover the two planning workflows end to end, not every C++ function:
 
@@ -352,7 +360,7 @@ The bindings cover the two planning workflows end to end, not every C++ function
 | `TrajectoryPlanner` | `TrajectoryPlanner` | Constructor, `plan_mission`, `set_previous_path`. |
 | `PlanningResult`, `Corridor` | `PlanningResult`, `sfc::SFCResult` | Plus `control_points_xyz` and `sampler()`. |
 | `TrajectorySampler` | `bspline::TrajectorySampler` | Plus a vectorised `sample(times)`. |
-| `min_snap.plot` | — | Optional matplotlib plots: `plot_trajectory`, `plot_profiles`, `plot_plan` (needs the `viz` extra). |
+| `coast_planner.plot` | — | Optional matplotlib plots: `plot_trajectory`, `plot_profiles`, `plot_plan` (needs the `viz` extra). |
 
 Not bound: the front-end and optimisation internals (`FrontEndSFC`, `astar_sfc`,
 `matrix_builder`, `optimize`, MINVO builders), `set_front_end_override`, and the
@@ -634,7 +642,7 @@ costs solve time super-linearly, so this is a genuine trade rather than a tuning
 **Rebuild consumers after changing this library.** It is statically linked, so a consumer
 built against an older archive keeps the old code until it is relinked. That failure is at
 least loud — an undefined symbol at link time — rather than the silent runtime corruption
-the previous shared-library setup produced. `ldd <binary> | grep min_snap` should return
+the previous shared-library setup produced. `ldd <binary> | grep coast_planner` should return
 nothing; if it returns a path, something is still linking it dynamically.
 
 **Corridors guarantee the *reference trajectory* is clear**, by exactly
@@ -659,7 +667,7 @@ cpp/                    the C++ engine — this is the production artifact
   deps/                 vendored nanoflann
   cmake/                MinSnapDeps.cmake: finds or downloads Eigen + OSQP
 pyproject.toml          pip packaging (scikit-build-core -> cpp/CMakeLists.txt)
-python/min_snap/        the Python package: bindings to the C++ engine
+python/coast_planner/        the Python package: bindings to the C++ engine
 python/tests/           binding tests
 python/examples/        benchmark.py (timing), plot_demo.py (visualization)
 ```
