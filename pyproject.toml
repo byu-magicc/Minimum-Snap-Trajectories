@@ -4,9 +4,9 @@ requires = ["scikit-build-core>=0.11", "pybind11>=2.12"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "min-snap"
+name = "coast-planner"
 version = "0.1.0"
-description = "Real-time minimum-snap B-spline trajectory generation with Safe Flight Corridors (C++17 engine, Python bindings)"
+description = "COAST: real-time minimum-snap B-spline trajectory planning through Safe Flight Corridors (C++17 engine, Python bindings)"
 readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -38,7 +38,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-# Plotting (min_snap.plot). Kept optional so the core package stays light and headless.
+# Plotting (coast_planner.plot). Kept optional so the core package stays light and headless.
 viz = ["matplotlib>=3.5"]
 test = ["pytest", "matplotlib>=3.5"]
 
@@ -49,10 +49,10 @@ Issues = "https://github.com/byu-magicc/Minimum-Snap-Trajectories/issues"
 Changelog = "https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CHANGELOG.md"
 
 [tool.scikit-build]
-# The C++ project lives in cpp/; the pure-Python half of the package in python/min_snap/.
+# The C++ project lives in cpp/; the pure-Python half of the package in python/coast_planner/.
 cmake.source-dir = "cpp"
 cmake.build-type = "Release"
-wheel.packages = ["python/min_snap"]
+wheel.packages = ["python/coast_planner"]
 # Persistent build dir so `pip install -e .` rebuilds incrementally instead of from scratch.
 build-dir = "build/{wheel_tag}"
 # The sdist only needs what builds the package: keep CI config and the JOSS paper out of it.

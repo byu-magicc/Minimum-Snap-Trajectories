@@ -1,4 +1,4 @@
-"""Tests for min_snap.plot (rendered headless with the Agg backend)."""
+"""Tests for coast_planner.plot (rendered headless with the Agg backend)."""
 
 import numpy as np
 import pytest
@@ -7,9 +7,9 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from min_snap import (FrontEndConfig, MinSnapClamped, MinSnapNatural, ObstacleBox,  # noqa: E402
+from coast_planner import (FrontEndConfig, MinSnapClamped, MinSnapNatural, ObstacleBox,  # noqa: E402
                       SparseVoxelGrid, TrajectoryPlanner, TrajectorySampler)
-from min_snap.plot import _disp, plot_plan, plot_profiles, plot_trajectory  # noqa: E402
+from coast_planner.plot import _disp, plot_plan, plot_profiles, plot_trajectory  # noqa: E402
 
 DRONE_R = 0.49
 

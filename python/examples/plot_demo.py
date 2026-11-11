@@ -1,6 +1,6 @@
 """Visualise an unconstrained solve and an obstacle-avoiding plan.
 
-    pip install "min-snap[viz]"
+    pip install "coast-planner[viz]"
     python python/examples/plot_demo.py            # opens windows
     python python/examples/plot_demo.py --save out  # writes PNGs to ./out instead
 
@@ -13,9 +13,9 @@ import os
 
 import numpy as np
 
-from min_snap import (FrontEndConfig, MinSnapClamped, ObstacleBox, SparseVoxelGrid,
+from coast_planner import (FrontEndConfig, MinSnapClamped, ObstacleBox, SparseVoxelGrid,
                       TrajectoryPlanner)
-from min_snap.plot import plot_plan, plot_profiles, plot_trajectory
+from coast_planner.plot import plot_plan, plot_profiles, plot_trajectory
 
 
 @contextlib.contextmanager

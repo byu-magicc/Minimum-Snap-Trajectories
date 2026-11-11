@@ -1,6 +1,7 @@
 // Python bindings for the minimum-snap engine.
 //
-// Built as the extension module `min_snap._core`; python/min_snap/__init__.py re-exports it.
+// Built as the extension module `coast_planner._core`; python/coast_planner/__init__.py
+// re-exports it.
 // Two paradigms are exposed:
 //
 //   1. Unconstrained minimum snap -- MinSnapEvalClamped / MinSnapEvalNatural. The optimal

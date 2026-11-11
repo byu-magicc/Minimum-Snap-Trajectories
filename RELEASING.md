@@ -42,7 +42,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <(awk '/^## \[X.Y.Z\]/{f=
   at acceptance.
 - **PyPI:** publishing the GitHub release runs `.github/workflows/wheels.yml`, which builds
   and tests every wheel plus the sdist, then uploads them (requires the one-time setup below).
-  Check the release appears at https://pypi.org/project/min-snap/.
+  Check the release appears at https://pypi.org/project/coast-planner/.
 - Announce the release where relevant, and close or update the issues it resolves.
 
 ## One-time setup: trusted publishing (PyPI and TestPyPI)
@@ -55,7 +55,7 @@ Do this once per index, logged in to [pypi.org](https://pypi.org) and
 
    | Field | Value |
    |---|---|
-   | PyPI project name | `min-snap` |
+   | PyPI project name | `coast-planner` |
    | Owner | `byu-magicc` |
    | Repository name | `Minimum-Snap-Trajectories` |
    | Workflow name | `wheels.yml` |
@@ -69,7 +69,7 @@ Do this once per index, logged in to [pypi.org](https://pypi.org) and
    TestPyPI*. Then check it installs:
    ```bash
    pip install --index-url https://test.pypi.org/simple/ \
-               --extra-index-url https://pypi.org/simple/ min-snap
+               --extra-index-url https://pypi.org/simple/ coast-planner
    ```
    (The extra index supplies numpy, which is not on TestPyPI.)
 

@@ -1,4 +1,4 @@
-"""Verification suite for the min_snap Python bindings.
+"""Verification suite for the coast_planner Python bindings.
 
 Run either way:
     pytest python/tests                       # after `pip install -e .`
@@ -19,8 +19,8 @@ import sys
 
 import numpy as np
 
-import min_snap
-from min_snap import (
+import coast_planner
+from coast_planner import (
     FrontEndConfig,
     MinSnapClamped,
     MinSnapEvalClamped,
@@ -72,8 +72,8 @@ def box_distance(p, box_min, box_max):
 def test_aliases_and_exports():
     assert MinSnapClamped is MinSnapEvalClamped
     assert MinSnapNatural is MinSnapEvalNatural
-    for name in min_snap.__all__:
-        assert hasattr(min_snap, name), name
+    for name in coast_planner.__all__:
+        assert hasattr(coast_planner, name), name
 
 
 def test_solver_structure():
@@ -442,6 +442,6 @@ if __name__ == "__main__":
         except Exception as e:  # noqa: BLE001
             failed += 1
             print(f"FAIL {name}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed  (min_snap {min_snap.__version__}, "
-          f"from {min_snap.__file__})")
+    print(f"\n{len(tests) - failed}/{len(tests)} passed  (coast_planner {coast_planner.__version__}, "
+          f"from {coast_planner.__file__})")
     sys.exit(1 if failed else 0)

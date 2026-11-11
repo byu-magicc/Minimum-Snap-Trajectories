@@ -1,6 +1,6 @@
 name: Wheels
 
-# Builds the binary wheels (and the source distribution) that `pip install min-snap` will
+# Builds the binary wheels (and the source distribution) that `pip install coast-planner` will
 # download from PyPI, tests every wheel in a clean environment, and publishes them.
 #
 #   pull requests:  one Python version per platform, as a quick check that packaging works
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/min-snap
+      url: https://test.pypi.org/p/coast-planner
     permissions:
       id-token: write   # trusted publishing: no API token stored anywhere
     steps:
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: pypi
-      url: https://pypi.org/p/min-snap
+      url: https://pypi.org/p/coast-planner
     permissions:
       id-token: write
     steps:
