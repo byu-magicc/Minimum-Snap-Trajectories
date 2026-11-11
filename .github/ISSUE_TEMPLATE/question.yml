@@ -1,0 +1,11 @@
+name: Question
+description: Ask how to use the planner or the Python bindings.
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to do and what you have tried so far. Code snippets help.
+    validations:
+      required: true

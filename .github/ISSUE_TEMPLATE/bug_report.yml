@@ -1,0 +1,48 @@
+name: Bug report
+description: Something is broken, crashes, or plans incorrectly.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what happened instead. Include the full error message if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: |
+        A minimal script or program. For planning problems include the start and goal, the map
+        (obstacle boxes or scan), and the FrontEndConfig values you changed. Coordinates are NED
+        (z is negative-up).
+      render: python
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options: [Python (coast_planner), C++ library, ROS / roscopter integration]
+    validations:
+      required: true
+  - type: input
+    id: install
+    attributes:
+      label: How did you install it?
+      placeholder: e.g. pip install from git (commit abc1234), CMake build with system OSQP
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: e.g. Ubuntu 24.04 / GCC 13, macOS 15 / Apple clang, Windows 11 / MSVC 2022; Python 3.12
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Logs (the planner prints a blame breakdown on failed solves), screenshots, or plots.
