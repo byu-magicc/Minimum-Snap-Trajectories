@@ -39,7 +39,7 @@ pip install -e ".[test]"
 pytest python/tests
 ```
 
-Python edits under `python/min_snap/` take effect immediately; after changing C++ code, re-run
+Python edits under `python/coast_planner/` take effect immediately; after changing C++ code, re-run
 `pip install -e .` (the rebuild is incremental).
 
 ## Making a change

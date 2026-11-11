@@ -711,9 +711,9 @@ Honest list of rough edges, current as of this writing:
 
 ## Contributing and support
 
-Questions, bug reports and pull requests are welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md)
+Questions, bug reports and pull requests are welcome; see [`CONTRIBUTING.md`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CONTRIBUTING.md)
 for development setup, conventions and where to ask for help. Participation is governed by the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+[Code of Conduct](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CODE_OF_CONDUCT.md).
 
 ---
 

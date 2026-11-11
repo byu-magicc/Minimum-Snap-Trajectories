@@ -24,7 +24,7 @@ body:
     id: interface
     attributes:
       label: Interface
-      options: [Python (min_snap), C++ library, ROS / roscopter integration]
+      options: [Python (coast_planner), C++ library, ROS / roscopter integration]
     validations:
       required: true
   - type: input
