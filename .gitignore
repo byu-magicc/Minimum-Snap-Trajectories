@@ -16,3 +16,7 @@ cpp/test_minvo.py
 python/min_snap/_core*.so
 *.egg-info/
 .pytest_cache/
+
+# Python virtual environments, if created inside the repo
+.venv/
+venv/
