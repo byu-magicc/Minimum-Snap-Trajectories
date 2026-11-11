@@ -40,6 +40,38 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <(awk '/^## \[X.Y.Z\]/{f=
 - **Zenodo:** once the repository is connected to Zenodo (GitHub integration, one-time setup),
   every GitHub release is archived automatically with a DOI. JOSS requires such an archive DOI
   at acceptance.
-- **PyPI:** once the wheel-building workflow and trusted publishing exist (#17), pushing the
-  tag builds and uploads the wheels. Check the release appears on PyPI.
+- **PyPI:** publishing the GitHub release runs `.github/workflows/wheels.yml`, which builds
+  and tests every wheel plus the sdist, then uploads them (requires the one-time setup below).
+  Check the release appears at https://pypi.org/project/coast-planner/.
 - Announce the release where relevant, and close or update the issues it resolves.
+
+## One-time setup: trusted publishing (PyPI and TestPyPI)
+
+Trusted publishing lets the GitHub workflow upload without any stored password or API token.
+Do this once per index, logged in to [pypi.org](https://pypi.org) and
+[test.pypi.org](https://test.pypi.org) (separate accounts).
+
+1. Account → **Publishing** → **Add a new pending publisher**, with:
+
+   | Field | Value |
+   |---|---|
+   | PyPI project name | `coast-planner` |
+   | Owner | `byu-magicc` |
+   | Repository name | `Minimum-Snap-Trajectories` |
+   | Workflow name | `wheels.yml` |
+   | Environment name | `pypi` (on PyPI) / `testpypi` (on TestPyPI) |
+
+   "Pending" because the project does not exist yet; the first upload creates it.
+2. On GitHub, **Settings → Environments**: the `pypi` and `testpypi` environments are created
+   on first use. For `pypi`, consider adding yourself as a **required reviewer**, so every
+   upload waits for a click.
+3. Dry run: **Actions → Wheels → Run workflow**, tick *Publish the built distributions to
+   TestPyPI*. Then check it installs:
+   ```bash
+   pip install --index-url https://test.pypi.org/simple/ \
+               --extra-index-url https://pypi.org/simple/ coast-planner
+   ```
+   (The extra index supplies numpy, which is not on TestPyPI.)
+
+Versions on PyPI and TestPyPI can never be re-uploaded, even after deletion. If a TestPyPI dry
+run needs repeating, bump the version (e.g. `0.1.0.dev1`) rather than reusing one.

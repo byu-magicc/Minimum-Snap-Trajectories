@@ -1,33 +1,62 @@
 [build-system]
-requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+# scikit-build-core 0.11 is the first with PEP 639 license expressions (`license = "..."`).
+requires = ["scikit-build-core>=0.11", "pybind11>=2.12"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "min-snap"
+name = "coast-planner"
 version = "0.1.0"
-description = "Real-time minimum-snap B-spline trajectory generation with Safe Flight Corridors (C++17 engine, Python bindings)"
+description = "COAST: real-time minimum-snap B-spline trajectory planning through Safe Flight Corridors (C++17 engine, Python bindings)"
 readme = "README.md"
-requires-python = ">=3.8"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{ name = "BYU MAGICC Lab" }]  # TODO (authors): add individual names/emails as wanted
+requires-python = ">=3.9"
 dependencies = ["numpy"]
+keywords = [
+    "trajectory optimization", "minimum snap", "B-spline", "safe flight corridor",
+    "motion planning", "quadrotor", "UAV", "robotics", "OSQP",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: C++",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+# Plotting (coast_planner.plot). Kept optional so the core package stays light and headless.
+viz = ["matplotlib>=3.5"]
+test = ["pytest", "matplotlib>=3.5"]
 
 [project.urls]
-Repository = "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
+Homepage = "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
+Documentation = "https://github.com/byu-magicc/Minimum-Snap-Trajectories#readme"
+Issues = "https://github.com/byu-magicc/Minimum-Snap-Trajectories/issues"
+Changelog = "https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CHANGELOG.md"
 
 [tool.scikit-build]
-# The C++ project lives in cpp/; the pure-Python half of the package in python/min_snap/.
+# The C++ project lives in cpp/; the pure-Python half of the package in python/coast_planner/.
 cmake.source-dir = "cpp"
 cmake.build-type = "Release"
-wheel.packages = ["python/min_snap"]
+wheel.packages = ["python/coast_planner"]
 # Persistent build dir so `pip install -e .` rebuilds incrementally instead of from scratch.
 build-dir = "build/{wheel_tag}"
+# The sdist only needs what builds the package: keep CI config and the JOSS paper out of it.
+sdist.exclude = [".github", "paper"]
 
 [tool.scikit-build.cmake.define]
 BUILD_PYTHON_BINDINGS = "ON"
@@ -35,3 +64,16 @@ BUILD_TESTS = "OFF"
 BUILD_EXAMPLES = "OFF"
 # Self-contained: download and statically link Eigen + OSQP, ignore system copies.
 MIN_SNAP_BUNDLED_DEPS = "ON"
+
+# Wheel builds (.github/workflows/wheels.yml). Each wheel is installed into a clean environment
+# and the binding tests are run against it before it can be published.
+[tool.cibuildwheel]
+# CPython only (no PyPy/GraalPy), and not the free-threaded builds: the module has not been
+# audited for running without the GIL.
+build = "cp*"
+skip = ["cp3??t-*", "*-musllinux_*", "*-win32", "*-manylinux_i686"]
+build-verbosity = 1
+test-requires = ["pytest"]
+# Tests run from a temp dir, so they import the installed wheel, not the source tree.
+# test_plot.py skips itself when matplotlib is absent, which keeps this step fast.
+test-command = "pytest {project}/python/tests -q"

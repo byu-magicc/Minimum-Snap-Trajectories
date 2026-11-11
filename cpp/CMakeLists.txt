@@ -187,13 +187,13 @@ endif()
 # ==========================================
 # 4. PYTHON BINDINGS (PYBIND11)
 # ==========================================
-# Builds the extension module `min_snap._core` (python/min_snap/ re-exports it).
+# Builds the extension module `coast_planner._core` (python/coast_planner/ re-exports it).
 #
 #   pip install -e .        -> scikit-build-core turns this ON and installs the module into
 #                              the environment (SKBUILD is defined).
 #   cmake -DBUILD_PYTHON_BINDINGS=ON ..
-#                           -> the module is written straight into python/min_snap/, so
-#                              `PYTHONPATH=python python -c "import min_snap"` works with no
+#                           -> the module is written straight into python/coast_planner/, so
+#                              `PYTHONPATH=python python -c "import coast_planner"` works with no
 #                              install step.
 #
 # OFF by default so consumers that pull this directory in with add_subdirectory() (roscopter)
@@ -228,9 +228,9 @@ if(BUILD_PYTHON_BINDINGS)
     target_link_libraries(min_snap_bindings PRIVATE min_snap_engine)
 
     if(SKBUILD)
-        install(TARGETS min_snap_bindings LIBRARY DESTINATION min_snap)
+        install(TARGETS min_snap_bindings LIBRARY DESTINATION coast_planner)
     else()
-        set(MIN_SNAP_PY_PKG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../python/min_snap)
+        set(MIN_SNAP_PY_PKG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../python/coast_planner)
         set_target_properties(min_snap_bindings PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY ${MIN_SNAP_PY_PKG_DIR}
             # multi-config generators (Ninja Multi-Config, Visual Studio) append the config name

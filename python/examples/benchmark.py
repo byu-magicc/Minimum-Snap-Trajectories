@@ -1,7 +1,7 @@
-"""Benchmark the C++ engine through the `min_snap` Python bindings.
+"""Benchmark the C++ engine through the `coast_planner` Python bindings.
 
     pip install -e .            (from the repo root), then
-    python python/benchmark_python.py
+    python python/examples/benchmark.py
 
 1. Unconstrained minimum snap (clamped and natural): Python-side cost of one C = SE @ Q solve.
 2. SFC-constrained planning on the floating-blocks scene from
@@ -16,7 +16,7 @@ import time
 
 import numpy as np
 
-from min_snap import (FrontEndConfig, MinSnapClamped, MinSnapNatural, ObstacleBox,
+from coast_planner import (FrontEndConfig, MinSnapClamped, MinSnapNatural, ObstacleBox,
                       SparseVoxelGrid, TrajectoryPlanner)
 
 

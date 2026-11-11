@@ -14,6 +14,10 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Added
 
+- **Wheel builds** (`.github/workflows/wheels.yml`, cibuildwheel): CPython 3.9–3.14 wheels for
+  Linux (x86_64, aarch64), macOS (Intel, Apple Silicon) and Windows (x86_64), each tested in a
+  clean environment, plus a tested sdist. Publishing to TestPyPI and PyPI through trusted
+  publishing. (#17)
 - **Unconstrained minimum-snap solvers** for clamped and natural uniform B-splines
   (`MinSnapEvalClamped`, `MinSnapEvalNatural`). The optimal control points are a closed-form
   linear map of the boundary states, `C = SE · Q`, so a free-space solve is one matrix product.
@@ -33,10 +37,14 @@ The first release, 0.1.0, will be cut from this section.
   assertions throw instead of corrupting memory (`MIN_SNAP_EIGEN_SAFETY`, on by default).
 - **Tools:** `minimal_planner_loop` example, stress sweep (`stress_planner`), QP-failure replay
   tools, and probes for walls and `v_max`.
-- **Python package `min_snap`** (pybind11), installable with `pip install`. It covers the
+- **Python package `coast_planner`** (pybind11), installable with `pip install`. It covers the
   unconstrained solvers, the voxel grid, `FrontEndConfig`, `TrajectoryPlanner`,
   `PlanningResult` (with its corridors) and `TrajectorySampler`. A test suite checks boundary
   states and minimum-snap optimality by evaluating the splines. (#2)
+- **Optional plotting module `coast_planner.plot`** (`pip install "coast-planner[viz]"`):
+  `plot_trajectory`, `plot_profiles` and `plot_plan` for trajectories, derivative profiles
+  and plans with their corridors and obstacles. Python `Corridor` objects gain `vertices`.
+  (#27)
 - **Continuous integration** on Linux, macOS and Windows: C++ build, tests and example, plus
   `pip install` and pytest on Python 3.9 and 3.13. (#3, #7)
 - **Dependency bundling:** Eigen 3.4.0, OSQP v1.0.0 and GoogleTest 1.15.2 are downloaded when
@@ -48,12 +56,26 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Changed
 
+- **Renamed the Python package to COAST's name:** install with `pip install coast-planner`,
+  import as `coast_planner` (previously `min-snap` / `min_snap`, never published). The C++
+  library target `min_snap_engine` and the `MIN_SNAP_*` CMake options are unchanged, so C++
+  consumers such as roscopter are unaffected.
+- Python packaging metadata for PyPI: SPDX license expression (BSD-3-Clause), keywords,
+  classifiers and project URLs; `requires-python` raised to 3.9 (3.8 is end-of-life and was
+  never tested). (#17)
 - `TrajectoryPlanner` takes a `std::shared_ptr<mapping::SparseVoxelGrid>` rather than a list
   of obstacle boxes. The Python bindings were rebuilt for this API. (#2)
 - `optimize.cpp` includes `<osqp.h>` instead of `<osqp/osqp.h>`, so OSQP installed outside a
   default include path (or the bundled copy) works. (#7)
 - README brought up to date: corrected defaults, Python API reference, cross-platform
   build commands, known limitations. (#8)
+
+### Removed
+
+- The original pure-Python prototype, the `data/` benchmark figures and `requirements.txt`
+  are no longer on `main`. They are preserved on the `legacy/python-prototype` branch and
+  the `prototype-archive` tag. The bindings benchmark moved to
+  `python/examples/benchmark.py`. (#22)
 
 ### Fixed
 
