@@ -643,7 +643,7 @@ costs solve time super-linearly, so this is a genuine trade rather than a tuning
 **Rebuild consumers after changing this library.** It is statically linked, so a consumer
 built against an older archive keeps the old code until it is relinked. That failure is at
 least loud — an undefined symbol at link time — rather than the silent runtime corruption
-the previous shared-library setup produced. `ldd <binary> | grep coast_planner` should return
+the previous shared-library setup produced. `ldd <binary> | grep min_snap_engine` should return
 nothing; if it returns a path, something is still linking it dynamically.
 
 **Corridors guarantee the *reference trajectory* is clear**, by exactly
