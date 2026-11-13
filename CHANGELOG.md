@@ -10,14 +10,25 @@ into a version (see [`RELEASING.md`](RELEASING.md)).
 
 ## [Unreleased]
 
-The first release, 0.1.0, will be cut from this section.
+## [0.1.0] - 2026-11-13
+
+First public release of **COAST** (Corridor-Optimized Aerially-Safe Trajectories): a real-time
+minimum-snap B-spline trajectory planner with Safe Flight Corridors, as a C++17 library and the
+`coast-planner` Python package.
+
+```bash
+pip install coast-planner
+```
+
+Prebuilt wheels: CPython 3.9–3.14 on Linux (x86_64, aarch64), macOS (Intel, Apple Silicon)
+and Windows (x86_64).
 
 ### Added
 
 - **Wheel builds** (`.github/workflows/wheels.yml`, cibuildwheel): CPython 3.9–3.14 wheels for
   Linux (x86_64, aarch64), macOS (Intel, Apple Silicon) and Windows (x86_64), each tested in a
   clean environment, plus a tested sdist. Publishing to TestPyPI and PyPI through trusted
-  publishing. (#17)
+  publishing. (#30)
 - **Unconstrained minimum-snap solvers** for clamped and natural uniform B-splines
   (`MinSnapEvalClamped`, `MinSnapEvalNatural`). The optimal control points are a closed-form
   linear map of the boundary states, `C = SE · Q`, so a free-space solve is one matrix product.
@@ -52,17 +63,17 @@ The first release, 0.1.0, will be cut from this section.
   the Python package needs only a compiler and git. (#7)
 - BSD 3-Clause license.
 - `CITATION.cff` with authors and ORCIDs (GitHub's "Cite this repository" button; read by
-  Zenodo for release DOIs), and a Citing section in the README. (#15)
+  Zenodo for release DOIs), and a Citing section in the README. (#33)
 
 ### Changed
 
 - **Renamed the Python package to COAST's name:** install with `pip install coast-planner`,
   import as `coast_planner` (previously `min-snap` / `min_snap`, never published). The C++
   library target `min_snap_engine` and the `MIN_SNAP_*` CMake options are unchanged, so C++
-  consumers such as roscopter are unaffected.
+  consumers such as roscopter are unaffected. (#32)
 - Python packaging metadata for PyPI: SPDX license expression (BSD-3-Clause), keywords,
   classifiers and project URLs; `requires-python` raised to 3.9 (3.8 is end-of-life and was
-  never tested). (#17)
+  never tested). (#30)
 - `TrajectoryPlanner` takes a `std::shared_ptr<mapping::SparseVoxelGrid>` rather than a list
   of obstacle boxes. The Python bindings were rebuilt for this API. (#2)
 - `optimize.cpp` includes `<osqp.h>` instead of `<osqp/osqp.h>`, so OSQP installed outside a
@@ -90,4 +101,5 @@ The first release, 0.1.0, will be cut from this section.
   the real default is 0.5. Also corrected `astar_max_nodes` (3000) and `planning_horizon`
   (12.0). (#8)
 
-[Unreleased]: https://github.com/byu-magicc/Minimum-Snap-Trajectories/commits/main
+[Unreleased]: https://github.com/byu-magicc/Minimum-Snap-Trajectories/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/byu-magicc/Minimum-Snap-Trajectories/releases/tag/v0.1.0
