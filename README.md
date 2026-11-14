@@ -1,6 +1,8 @@
 # COAST: Corridor-Optimized Aerially-Safe Trajectories
 
 [![CI](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/coast-planner)](https://pypi.org/project/coast-planner/)
+[![Python](https://img.shields.io/pypi/pyversions/coast-planner)](https://pypi.org/project/coast-planner/)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/LICENSE)
 
 COAST is a real-time trajectory planner for multirotors flying through cluttered,
@@ -30,10 +32,27 @@ Known limitations, including the exceptions to corridor containment, are listed 
 
 ## Installation
 
-COAST installs from this repository with `pip`, which downloads its dependencies (Eigen,
-OSQP, pybind11, NumPy) and compiles the planner. The first install takes a few minutes.
+```bash
+pip install coast-planner            # Python 3.9–3.14 on Linux, macOS and Windows
+pip install "coast-planner[viz]"     # optional: plotting with matplotlib
+```
 
-### 1. Prerequisites (one-time)
+Prebuilt wheels are provided, so no compiler is needed. Installing into a virtual environment
+is recommended:
+
+| | Create | Activate |
+|---|---|---|
+| Linux / macOS | `python3 -m venv .venv` | `source .venv/bin/activate` |
+| Windows (PowerShell) | `py -m venv .venv` | `.venv\Scripts\Activate.ps1` |
+
+If PowerShell blocks activation, see the note under step 2 below.
+
+### From source (to modify the code or run the examples)
+
+Installing from the repository compiles the planner; `pip` downloads its dependencies (Eigen,
+OSQP, pybind11, NumPy). The first install takes a few minutes.
+
+#### 1. Prerequisites (one-time)
 
 You need Python 3.9 or newer, git, and a C++17 compiler:
 
@@ -43,7 +62,7 @@ You need Python 3.9 or newer, git, and a C++17 compiler:
 | macOS | `xcode-select --install` (Python 3 from [python.org](https://www.python.org/downloads/) or Homebrew) |
 | Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) |
 
-### 2. Download and install
+#### 2. Download and install
 
 Linux / macOS:
 
@@ -69,7 +88,7 @@ If PowerShell refuses to activate ("running scripts is disabled"), run
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. In a new
 terminal, activate the environment again before using COAST.
 
-### 3. Check that it works
+#### 3. Check that it works
 
 ```bash
 python python/examples/plot_demo.py
