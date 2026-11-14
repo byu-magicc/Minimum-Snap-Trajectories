@@ -1,6 +1,6 @@
 name: CI
 
-# cpp:       the README's build with system dependencies (apt Eigen, OSQP installed from
+# cpp:       the documented build (docs/building.md) with system dependencies (apt Eigen, OSQP installed from
 #            source), Ubuntu only.
 # cpp-cross: the same default build on Linux, macOS and Windows with nothing preinstalled, so
 #            Eigen, OSQP and GoogleTest are downloaded by the build itself.
@@ -36,7 +36,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends cmake libeigen3-dev libgtest-dev
 
       # OSQP is not packaged for apt. Build it once (source + build tree are cached), then
-      # install it to /usr/local every run, exactly as the README instructs.
+      # install it to /usr/local every run, exactly as docs/building.md instructs.
       - name: Cache OSQP build
         id: cache-osqp
         uses: actions/cache@v6
