@@ -67,6 +67,10 @@ and Windows (x86_64).
 
 ### Changed
 
+- README rewritten as a short overview: what COAST is, installation (pip, or from source with
+  one prerequisite line per OS), one example, and pointers to the ROSflight integration.
+  The detailed material moved unchanged into `docs/` (how it works, Python and C++ guides,
+  configuration, building and development, limitations).
 - **Renamed the Python package to COAST's name:** install with `pip install coast-planner`,
   import as `coast_planner` (previously `min-snap` / `min_snap`, never published). The C++
   library target `min_snap_engine` and the `MIN_SNAP_*` CMake options are unchanged, so C++

@@ -22,7 +22,7 @@ SFC-constrained (obstacle avoidance through Safe Flight Corridors)::
     planner = TrajectoryPlanner(FrontEndConfig(voxel_resolution=0.5), grid)
     result = planner.plan_mission([0, 0, -2], [12, 0, -2])
 
-Coordinates are NED (z is negative-up); see the README.
+Coordinates are NED (z is negative-up); see docs/how-it-works.md in the repository.
 """
 
 from ._core import (
