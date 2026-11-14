@@ -45,28 +45,60 @@ is recommended:
 | Linux / macOS | `python3 -m venv .venv` | `source .venv/bin/activate` |
 | Windows (PowerShell) | `py -m venv .venv` | `.venv\Scripts\Activate.ps1` |
 
-On Windows, if activation is blocked ("running scripts is disabled"), run
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then activate again.
+If PowerShell blocks activation, see the note under step 2 below.
 
-### From source (to modify the code)
+### From source (to modify the code or run the examples)
 
-Building from source needs a C++17 compiler and git. Everything else (Eigen, OSQP,
-pybind11) is downloaded automatically.
+Installing from the repository compiles the planner; `pip` downloads its dependencies (Eigen,
+OSQP, pybind11, NumPy). The first install takes a few minutes.
 
-| OS | Install the compiler |
+#### 1. Prerequisites (one-time)
+
+You need Python 3.9 or newer, git, and a C++17 compiler:
+
+| OS | Install |
 |---|---|
-| Ubuntu / Debian | `sudo apt install build-essential git` |
-| macOS | `xcode-select --install` |
-| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), workload "Desktop development with C++", plus [Git](https://git-scm.com/download/win) |
+| Ubuntu / Debian | `sudo apt install build-essential git python3-venv` |
+| macOS | `xcode-select --install` (Python 3 from [python.org](https://www.python.org/downloads/) or Homebrew) |
+| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) |
+
+#### 2. Download and install
+
+Linux / macOS:
 
 ```bash
 git clone https://github.com/byu-magicc/Minimum-Snap-Trajectories.git
 cd Minimum-Snap-Trajectories
-pip install -e ".[viz,test]"         # editable: Python edits apply immediately; re-run after C++ edits
+python3 -m venv .venv
+source .venv/bin/activate
+pip install ".[viz]"
 ```
 
-To use the C++ library directly (CMake), see
-[docs/building.md](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/docs/building.md).
+Windows (PowerShell):
+
+```powershell
+git clone https://github.com/byu-magicc/Minimum-Snap-Trajectories.git
+cd Minimum-Snap-Trajectories
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install ".[viz]"
+```
+
+If PowerShell refuses to activate ("running scripts is disabled"), run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. In a new
+terminal, activate the environment again before using COAST.
+
+#### 3. Check that it works
+
+```bash
+python python/examples/plot_demo.py
+```
+
+This opens plots of a free-space trajectory and of a planned path around two obstacles.
+
+To modify the code, install in editable mode instead: `pip install -e ".[viz,test]"`. Python
+edits then apply immediately; re-run it after changing C++. To use the C++ library directly
+with CMake, see [docs/building.md](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/docs/building.md).
 
 ## Example
 
