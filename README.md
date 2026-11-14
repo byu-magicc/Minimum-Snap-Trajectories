@@ -34,6 +34,7 @@ lives in whatever system consumes it.
 - [Gotchas](#gotchas)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
+- [Citing](#citing)
 - [License](#license)
 
 ---
@@ -642,7 +643,7 @@ costs solve time super-linearly, so this is a genuine trade rather than a tuning
 **Rebuild consumers after changing this library.** It is statically linked, so a consumer
 built against an older archive keeps the old code until it is relinked. That failure is at
 least loud — an undefined symbol at link time — rather than the silent runtime corruption
-the previous shared-library setup produced. `ldd <binary> | grep coast_planner` should return
+the previous shared-library setup produced. `ldd <binary> | grep min_snap_engine` should return
 nothing; if it returns a path, something is still linking it dynamically.
 
 **Corridors guarantee the *reference trajectory* is clear**, by exactly
@@ -708,6 +709,17 @@ Honest list of rough edges, current as of this writing:
 
 ---
 
+## Citing
+
+If you use COAST in research, please cite it. Citation metadata, including authors and ORCIDs, is
+in [`CITATION.cff`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CITATION.cff); GitHub's **Cite this repository** button generates BibTeX
+and APA from it.
+
+<!-- TODO (authors, #15): add the BibTeX for the ACC paper / arXiv preprint here, and the JOSS
+     paper after acceptance. -->
+
+---
+
 ## License
 
-BSD 3-Clause; see [`LICENSE`](LICENSE). Copyright (c) 2026, BYU MAGICC Lab.
+BSD 3-Clause; see [`LICENSE`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/LICENSE). Copyright (c) 2026, BYU MAGICC Lab.

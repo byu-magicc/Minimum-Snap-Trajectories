@@ -1,0 +1,46 @@
+# Citation metadata (#15). GitHub shows a "Cite this repository" button from this file, and Zenodo
+# reads it for the DOI record of each release. Keep `version` in step with pyproject.toml.
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "COAST: Corridor-Optimized Aerially-Safe Trajectories"
+abstract: >-
+  COAST is a real-time minimum-snap B-spline trajectory planner for multirotors flying through
+  cluttered, partially-unknown environments. An A* front end builds Safe Flight Corridors, and
+  a quadratic-programming back end (OSQP) optimises snap-minimised control points inside them
+  with MINVO kinodynamic bounds. C++17 engine with Python bindings (coast-planner on PyPI).
+type: software
+authors:
+  - given-names: Alejandro
+    family-names: Pelaez
+    orcid: "https://orcid.org/0009-0009-0848-4365"
+    affiliation: "MAGICC Lab, Brigham Young University"
+  - given-names: Brady
+    family-names: Moon
+    orcid: "https://orcid.org/0000-0003-4297-3938"
+    affiliation: "FROST Lab, Brigham Young University"
+  - given-names: Randal
+    family-names: Beard
+    orcid: "https://orcid.org/0000-0002-2548-5329"
+    affiliation: "MAGICC Lab, Brigham Young University"
+license: BSD-3-Clause
+repository-code: "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
+version: 0.1.0
+keywords:
+  - trajectory optimization
+  - minimum snap
+  - B-splines
+  - safe flight corridors
+  - quadrotors
+  - motion planning
+# TODO (authors): uncomment and fill in once the ACC paper / arXiv preprint is public, so the
+# "Cite" button points people to the paper. Replace with the JOSS paper after acceptance.
+# preferred-citation:
+#   type: conference-paper
+#   title: "TODO"
+#   authors:
+#     - given-names: TODO
+#       family-names: TODO
+#   conference:
+#     name: "American Control Conference (ACC)"
+#   year: TODO
+#   doi: "TODO"
