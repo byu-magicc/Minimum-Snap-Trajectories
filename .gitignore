@@ -20,3 +20,6 @@ python/coast_planner/_core*.so
 # Python virtual environments, if created inside the repo
 .venv/
 venv/
+
+# Output of python/examples/plot_demo.py when no plot window can be opened
+coast_demo_plots/
