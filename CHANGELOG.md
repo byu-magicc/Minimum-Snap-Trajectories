@@ -56,6 +56,10 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Changed
 
+- `plot_demo.py` checks whether plot windows can open and, if not (Python without Tcl/Tk,
+  no display), explains why and saves the plots as PNGs instead of failing or silently
+  showing nothing. README prerequisites now list `python3-tk` (Ubuntu), the Tcl/Tk
+  installer option (Windows), and `conda deactivate` before using the venv.
 - README rewritten as a short overview: what COAST is, step-by-step installation from the
   repository for Linux, macOS and Windows, one example, and pointers to the ROSflight
   integration. The detailed material moved unchanged into `docs/` (how it works, Python and

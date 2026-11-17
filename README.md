@@ -39,9 +39,9 @@ You need Python 3.9 or newer, git, and a C++17 compiler:
 
 | OS | Install |
 |---|---|
-| Ubuntu / Debian | `sudo apt install build-essential git python3-venv` |
+| Ubuntu / Debian | `sudo apt install build-essential git python3-venv python3-tk` |
 | macOS | `xcode-select --install` (Python 3 from [python.org](https://www.python.org/downloads/) or Homebrew) |
-| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) |
+| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) (keep the installer's default **"tcl/tk and IDLE"** option; plot windows need it) |
 
 ### 2. Download and install
 
@@ -66,8 +66,9 @@ pip install ".[viz]"
 ```
 
 If PowerShell refuses to activate ("running scripts is disabled"), run
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. In a new
-terminal, activate the environment again before using COAST.
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. If you use
+Anaconda, run `conda deactivate` first, so conda's `(base)` environment doesn't mix with the
+venv. In a new terminal, activate the environment again before using COAST.
 
 ### 3. Check that it works
 
@@ -75,7 +76,10 @@ terminal, activate the environment again before using COAST.
 python python/examples/plot_demo.py
 ```
 
-This opens plots of a free-space trajectory and of a planned path around two obstacles.
+This opens plots of a free-space trajectory and of a planned path around two obstacles. If
+plot windows can't open on your machine (for example, Python without Tcl/Tk, or a remote
+session), the demo explains why and saves the plots as PNG files in `coast_demo_plots/`
+instead. The planner itself works either way.
 
 To modify the code, install in editable mode instead: `pip install -e ".[viz,test]"`. Python
 edits then apply immediately; re-run it after changing C++. To use the C++ library directly
