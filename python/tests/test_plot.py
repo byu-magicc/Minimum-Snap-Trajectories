@@ -127,6 +127,9 @@ def test_demo_saves_all_plots(tmp_path):
 
 def test_demo_command_is_installed():
     from importlib.metadata import entry_points
-    eps = entry_points(group="console_scripts")
-    demo = [ep for ep in eps if ep.name == "coast-planner-demo"]
+    eps = entry_points()
+    # Python 3.10+ returns a selectable EntryPoints; 3.9 returns a dict of group -> list
+    scripts = eps.select(group="console_scripts") if hasattr(eps, "select") \
+        else eps.get("console_scripts", [])
+    demo = [ep for ep in scripts if ep.name == "coast-planner-demo"]
     assert demo and demo[0].value == "coast_planner._demo:main"
