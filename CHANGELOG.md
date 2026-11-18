@@ -25,6 +25,8 @@ and Windows (x86_64).
 
 ### Added
 
+- Citation of the COAST paper (arXiv:2611.22447, DOI 10.48550/arXiv.2611.22447) in the
+  README and as the preferred citation in `CITATION.cff`. (#1, #38)
 - **Wheel builds** (`.github/workflows/wheels.yml`, cibuildwheel): CPython 3.9–3.14 wheels for
   Linux (x86_64, aarch64), macOS (Intel, Apple Silicon) and Windows (x86_64), each tested in a
   clean environment, plus a tested sdist. Publishing to TestPyPI and PyPI through trusted
@@ -67,6 +69,10 @@ and Windows (x86_64).
 
 ### Changed
 
+- `plot_demo.py` checks whether plot windows can open and, if not (Python without Tcl/Tk,
+  no display), explains why and saves the plots as PNGs instead of failing or silently
+  showing nothing. README prerequisites list `python3-tk` (Ubuntu), the Tcl/Tk installer
+  option (Windows), and `conda deactivate` before using the venv. (#37)
 - README rewritten as a short overview: what COAST is, installation (`pip install coast-planner`,
   or step by step from the repository on Linux, macOS and Windows), one example, and pointers
   to the ROSflight integration. The detailed material moved unchanged into `docs/` (how it

@@ -4,6 +4,9 @@
     python python/examples/plot_demo.py            # opens windows
     python python/examples/plot_demo.py --save out  # writes PNGs to ./out instead
 
+If plot windows cannot be opened (no Tk on this Python, no display over SSH), the demo says
+why and saves the PNGs to ./coast_demo_plots instead.
+
 Coordinates are NED; plots display East-North-Up (altitude = -z).
 """
 
@@ -16,6 +19,41 @@ import numpy as np
 from coast_planner import (FrontEndConfig, MinSnapClamped, ObstacleBox, SparseVoxelGrid,
                       TrajectoryPlanner)
 from coast_planner.plot import plot_plan, plot_profiles, plot_trajectory
+
+FALLBACK_DIR = "coast_demo_plots"
+# Backends that render to files only; with one of these, plt.show() silently does nothing.
+_NON_INTERACTIVE = {"agg", "cairo", "pdf", "pgf", "ps", "svg", "template"}
+
+
+def can_open_windows():
+    """True if matplotlib can open plot windows here; otherwise explain why and return False.
+
+    Two common failure modes are caught. Either matplotlib already chose a file-only backend
+    (Linux without python3-tk, or no display), so plt.show() would silently do nothing. Or the
+    window toolkit is installed but broken: on Windows, a Python whose Tcl/Tk files are
+    missing raises "Can't find a usable init.tcl" when the first window is created.
+    """
+    import matplotlib
+    import matplotlib.pyplot as plt
+    backend = matplotlib.get_backend()
+    reason = None
+    if backend.lower() in _NON_INTERACTIVE:
+        reason = f"matplotlib is using the file-only '{backend}' backend"
+    else:
+        try:
+            plt.close(plt.figure())  # creating a figure opens the toolkit; fails fast if broken
+        except Exception as e:  # noqa: BLE001 - any failure here means "no windows"
+            reason = f"{type(e).__name__}: {str(e).splitlines()[0]}"
+    if reason is None:
+        return True
+    print(f"Cannot open plot windows ({reason}).\n"
+          f"Saving the plots as PNG files in ./{FALLBACK_DIR} instead.\n"
+          "To get windows: on Ubuntu/Debian `sudo apt install python3-tk`; on Windows, re-run\n"
+          "the python.org installer, choose Modify and enable \"tcl/tk and IDLE\" (and don't run\n"
+          "inside an active conda environment); over SSH, view the PNG files instead.\n")
+    plt.close("all")
+    plt.switch_backend("Agg")
+    return False
 
 
 @contextlib.contextmanager
@@ -39,6 +77,8 @@ def main():
     import matplotlib
     if args.save:
         matplotlib.use("Agg")
+    elif not can_open_windows():
+        args.save = FALLBACK_DIR
     import matplotlib.pyplot as plt
 
     # 1. Free space, no map: the closed-form minimum-snap solve.

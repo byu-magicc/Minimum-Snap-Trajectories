@@ -3,6 +3,7 @@
 [![CI](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/coast-planner)](https://pypi.org/project/coast-planner/)
 [![Python](https://img.shields.io/pypi/pyversions/coast-planner)](https://pypi.org/project/coast-planner/)
+[![arXiv](https://img.shields.io/badge/arXiv-2611.22447-b31b1b)](https://arxiv.org/abs/2611.22447)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/LICENSE)
 
 COAST is a real-time trajectory planner for multirotors flying through cluttered,
@@ -24,7 +25,7 @@ give no collision guarantee, while corridor-based methods are safe but slow. COA
 - **Fast.** Median QP solve **0.32 ms** and mean end-to-end replan **3.1 ms** across 1,000
   randomised forests at 5% obstacle density (103,687 solves). In closed-loop ROSflight
   simulation, **zero** commanded setpoints violated the per-axis velocity or acceleration
-  limits (Intel i7-7700; see the COAST paper).
+  limits (Intel i7-7700; see the [COAST paper](https://arxiv.org/abs/2611.22447)).
 - **C++17 library with Python bindings**, no ROS dependency, on Linux, macOS and Windows.
 
 Known limitations, including the exceptions to corridor containment, are listed in
@@ -58,9 +59,9 @@ You need Python 3.9 or newer, git, and a C++17 compiler:
 
 | OS | Install |
 |---|---|
-| Ubuntu / Debian | `sudo apt install build-essential git python3-venv` |
+| Ubuntu / Debian | `sudo apt install build-essential git python3-venv python3-tk` |
 | macOS | `xcode-select --install` (Python 3 from [python.org](https://www.python.org/downloads/) or Homebrew) |
-| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) |
+| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) (keep the installer's default **"tcl/tk and IDLE"** option; plot windows need it) |
 
 #### 2. Download and install
 
@@ -85,8 +86,9 @@ pip install ".[viz]"
 ```
 
 If PowerShell refuses to activate ("running scripts is disabled"), run
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. In a new
-terminal, activate the environment again before using COAST.
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and activate again. If you use
+Anaconda, run `conda deactivate` first, so conda's `(base)` environment doesn't mix with the
+venv. In a new terminal, activate the environment again before using COAST.
 
 #### 3. Check that it works
 
@@ -94,7 +96,10 @@ terminal, activate the environment again before using COAST.
 python python/examples/plot_demo.py
 ```
 
-This opens plots of a free-space trajectory and of a planned path around two obstacles.
+This opens plots of a free-space trajectory and of a planned path around two obstacles. If
+plot windows can't open on your machine (for example, Python without Tcl/Tk, or a remote
+session), the demo explains why and saves the plots as PNG files in `coast_demo_plots/`
+instead. The planner itself works either way.
 
 To modify the code, install in editable mode instead: `pip install -e ".[viz,test]"`. Python
 edits then apply immediately; re-run it after changing C++. To use the C++ library directly
@@ -162,12 +167,26 @@ Questions, bug reports and pull requests are welcome through
 
 ## Citing
 
-If you use COAST in research, please cite it. Citation metadata, including authors and ORCIDs,
-is in [`CITATION.cff`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CITATION.cff);
-GitHub's **Cite this repository** button generates BibTeX and APA from it.
+If you use COAST in research, please cite the paper
+([arXiv:2611.22447](https://arxiv.org/abs/2611.22447)):
 
-<!-- TODO (authors, #15): add the BibTeX for the ACC paper / arXiv preprint here, and the JOSS
-     paper after acceptance. -->
+```bibtex
+@misc{pelaez2026coast,
+  title         = {{COAST}: Safe Flight Corridor Planner for Fast and Robust Snap Minimized Trajectories},
+  author        = {Pelaez, Alejandro and Beard, Randal W.},
+  year          = {2026},
+  eprint        = {2611.22447},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO},
+  doi           = {10.48550/arXiv.2611.22447},
+  url           = {https://arxiv.org/abs/2611.22447},
+  note          = {Submitted to the 2027 American Control Conference}
+}
+```
+
+Citation metadata for the software itself, with authors and ORCIDs, is in
+[`CITATION.cff`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/CITATION.cff);
+GitHub's **Cite this repository** button generates BibTeX and APA from it.
 
 ## License
 
