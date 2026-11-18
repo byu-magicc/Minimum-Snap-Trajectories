@@ -59,6 +59,9 @@ The first release, 0.1.0, will be cut from this section.
 - `CITATION.cff` with authors and ORCIDs (GitHub's "Cite this repository" button; read by
   Zenodo for release DOIs), and a Citing section in the README. (#15)
 
+- Release check: the Wheels workflow verifies that the tag, `pyproject.toml`, `CITATION.cff`
+  and `CHANGELOG.md` agree on the version (and release date) before anything is published.
+
 ### Changed
 
 - Copyright holder in `LICENSE` is Brigham Young University.
