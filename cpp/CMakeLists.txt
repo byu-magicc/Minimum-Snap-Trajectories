@@ -98,6 +98,11 @@ endif()
 # Link the Eigen3 math library to your engine
 target_link_libraries(min_snap_engine PUBLIC Eigen3::Eigen osqp::osqp)
 
+# COAST uses only Eigen's MPL-2.0 modules (Dense, Sparse). EIGEN_MPL2_ONLY makes Eigen raise a
+# compile error if any code it marks as non-MPL2 is ever included, so that stays true. PRIVATE: it
+# guards this project's own sources without imposing the setting on consumers. See licenses/README.md.
+target_compile_definitions(min_snap_engine PRIVATE EIGEN_MPL2_ONLY)
+
 # ==========================================
 # 3. BUILD THE GOOGLE TEST SUITE
 # ==========================================
@@ -226,6 +231,7 @@ if(BUILD_PYTHON_BINDINGS)
     pybind11_add_module(min_snap_bindings src/python_bindings.cpp)
     set_target_properties(min_snap_bindings PROPERTIES OUTPUT_NAME _core)
     target_link_libraries(min_snap_bindings PRIVATE min_snap_engine)
+    target_compile_definitions(min_snap_bindings PRIVATE EIGEN_MPL2_ONLY)  # see min_snap_engine
 
     if(SKBUILD)
         install(TARGETS min_snap_bindings LIBRARY DESTINATION coast_planner)

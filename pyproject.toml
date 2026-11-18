@@ -9,7 +9,8 @@ version = "0.1.0"
 description = "COAST: real-time minimum-snap B-spline trajectory planning through Safe Flight Corridors (C++17 engine, Python bindings)"
 readme = "README.md"
 license = "BSD-3-Clause"
-license-files = ["LICENSE"]
+# licenses/ holds the licenses of third-party code compiled into the wheels; see licenses/README.md
+license-files = ["LICENSE", "licenses/*"]
 authors = [{ name = "BYU MAGICC Lab" }]  # TODO (authors): add individual names/emails as wanted
 requires-python = ">=3.9"
 dependencies = ["numpy"]

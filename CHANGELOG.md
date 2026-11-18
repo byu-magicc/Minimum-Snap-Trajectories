@@ -14,6 +14,9 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Added
 
+- `licenses/`: license texts and notices for the third-party code compiled into the wheels
+  (OSQP, QDLDL, AMD, Eigen, pybind11, nanoflann), included in every wheel. The library is
+  compiled with `EIGEN_MPL2_ONLY` as a guard against including any non-MPL2 Eigen code.
 - Citation of the COAST paper (arXiv:2611.22447) in the README and as the preferred citation
   in `CITATION.cff`. (#1)
 - **Wheel builds** (`.github/workflows/wheels.yml`, cibuildwheel): CPython 3.9–3.14 wheels for
@@ -58,6 +61,7 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Changed
 
+- Copyright holder in `LICENSE` is Brigham Young University.
 - `plot_demo.py` checks whether plot windows can open and, if not (Python without Tcl/Tk,
   no display), explains why and saves the plots as PNGs instead of failing or silently
   showing nothing. README prerequisites now list `python3-tk` (Ubuntu), the Tcl/Tk

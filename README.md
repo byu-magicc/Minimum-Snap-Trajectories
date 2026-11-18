@@ -172,4 +172,6 @@ GitHub's **Cite this repository** button generates BibTeX and APA from it.
 ## License
 
 BSD 3-Clause; see [`LICENSE`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/LICENSE).
-Copyright (c) 2026, BYU MAGICC Lab.
+Copyright (c) 2026, Brigham Young University. The Python wheels also contain compiled
+third-party code (OSQP, Eigen, pybind11 and others); their licenses are listed in
+[`licenses/`](https://github.com/byu-magicc/Minimum-Snap-Trajectories/tree/main/licenses).
