@@ -13,10 +13,10 @@ name: Wheels
 
 on:
   pull_request:
-    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', '.github/workflows/wheels.yml']
+    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', 'CITATION.cff', 'CHANGELOG.md', '.github/**']
   push:
     branches: [main]
-    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', '.github/workflows/wheels.yml']
+    paths: ['cpp/**', 'python/**', 'pyproject.toml', 'LICENSE', 'README.md', 'CITATION.cff', 'CHANGELOG.md', '.github/**']
   release:
     types: [published]
   workflow_dispatch:
@@ -67,6 +67,21 @@ jobs:
           name: cibw-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
+  check_versions:
+    name: Version numbers agree
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # pyproject.toml and CITATION.cff must always agree. On a release, the tag must also be
+      # v<version>, and CHANGELOG.md must have that version's section, dated like CITATION.cff.
+      - name: Check version numbers
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: python3 .github/scripts/check_versions.py
+
   build_sdist:
     name: Source distribution
     runs-on: ubuntu-24.04
@@ -93,7 +108,7 @@ jobs:
 
   publish_testpypi:
     name: Publish to TestPyPI
-    needs: [build_wheels, build_sdist]
+    needs: [check_versions, build_wheels, build_sdist]
     if: github.event_name == 'workflow_dispatch' && inputs.publish_testpypi
     runs-on: ubuntu-24.04
     environment:
@@ -113,7 +128,7 @@ jobs:
 
   publish_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_sdist]
+    needs: [check_versions, build_wheels, build_sdist]
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-24.04
     environment:

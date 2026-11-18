@@ -18,6 +18,12 @@ the patch version (0.1.0 → 0.1.1) for fixes only.
    - `CITATION.cff`: `version: X.Y.Z` and `date-released: "YYYY-MM-DD"`
 3. Merge the pull request once CI is green.
 
+The Wheels workflow checks that these agree (`.github/scripts/check_versions.py`): on every
+run, `pyproject.toml` against `CITATION.cff`; on a release, also the tag against `v<version>`
+and the CHANGELOG section date against `date-released`. Publishing waits for this check, so a
+mismatch stops the release before anything is uploaded. Run it locally with
+`TAG=vX.Y.Z python .github/scripts/check_versions.py`.
+
 ## 2. Tag and publish
 
 From an up-to-date `main`:
