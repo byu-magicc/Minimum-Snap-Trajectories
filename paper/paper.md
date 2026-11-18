@@ -68,9 +68,9 @@ bibliography: paper.bib
 
 # Research impact
 
-<!-- TODO (#12). Evidence of real research use (JOSS rejects "aspirational" claims): the ACC
-     paper / arXiv preprint, the roscopter integration and flights or simulations run with it,
-     theses, other groups using it. -->
+<!-- TODO (#12). Evidence of real research use: the method paper (cite as
+     [@pelaez2026coast], arXiv:2611.22447), the roscopter integration and the flights or
+     simulations run with it, theses, other groups using it. -->
 
 # AI usage disclosure
 
