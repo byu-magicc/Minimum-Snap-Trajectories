@@ -25,6 +25,7 @@ authors:
 license: BSD-3-Clause
 repository-code: "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
 version: 0.1.0
+date-released: "2026-11-13"
 keywords:
   - trajectory optimization
   - minimum snap

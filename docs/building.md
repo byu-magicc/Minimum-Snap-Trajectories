@@ -72,11 +72,13 @@ python -c "import coast_planner; print(coast_planner.__version__)"
 
 A venv is recommended (on Ubuntu the system Python refuses `pip install`). Works on Linux,
 macOS and Windows with Python 3.9 or newer; CI runs `pip install` + the test suite on all three
-with Python 3.9 and 3.13. To use it from another project, install into that project's
-environment straight from GitHub:
+with Python 3.9 and 3.13. To use it from another project, install the release from PyPI into
+that project's environment (prebuilt wheels, no compiler needed), or the latest development
+version straight from GitHub:
 
 ```bash
-pip install "coast-planner @ git+https://github.com/byu-magicc/Minimum-Snap-Trajectories.git"
+pip install coast-planner                                                                  # release
+pip install "coast-planner @ git+https://github.com/byu-magicc/Minimum-Snap-Trajectories.git"  # development
 ```
 
 Nothing needs to be installed system-wide besides a C/C++ compiler and git. pip fetches
