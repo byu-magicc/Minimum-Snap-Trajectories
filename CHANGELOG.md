@@ -14,6 +14,8 @@ The first release, 0.1.0, will be cut from this section.
 
 ### Added
 
+- Citation of the COAST paper (arXiv:2611.22447) in the README and as the preferred citation
+  in `CITATION.cff`. (#1)
 - **Wheel builds** (`.github/workflows/wheels.yml`, cibuildwheel): CPython 3.9–3.14 wheels for
   Linux (x86_64, aarch64), macOS (Intel, Apple Silicon) and Windows (x86_64), each tested in a
   clean environment, plus a tested sdist. Publishing to TestPyPI and PyPI through trusted
