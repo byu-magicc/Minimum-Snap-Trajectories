@@ -32,9 +32,8 @@ keywords:
   - safe flight corridors
   - quadrotors
   - motion planning
-# The "Cite this repository" button points to the method paper. Add its DOI once arXiv's
-# DataCite DOI (10.48550/arXiv.2611.22447) resolves; replace with the ACC or JOSS version once
-# published.
+# The "Cite this repository" button points to the method paper. Replace with the ACC or JOSS
+# version once published.
 preferred-citation:
   type: article
   title: "COAST: Safe Flight Corridor Planner for Fast and Robust Snap Minimized Trajectories"
@@ -48,6 +47,7 @@ preferred-citation:
   year: 2026
   month: 11
   journal: "arXiv preprint"
+  doi: "10.48550/arXiv.2611.22447"
   url: "https://arxiv.org/abs/2611.22447"
   identifiers:
     - type: other

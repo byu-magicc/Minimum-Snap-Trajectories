@@ -159,6 +159,7 @@ If you use COAST in research, please cite the paper
   eprint        = {2611.22447},
   archivePrefix = {arXiv},
   primaryClass  = {cs.RO},
+  doi           = {10.48550/arXiv.2611.22447},
   url           = {https://arxiv.org/abs/2611.22447},
   note          = {Submitted to the 2027 American Control Conference}
 }
