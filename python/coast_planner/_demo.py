@@ -1,61 +1,42 @@
-"""Visualise an unconstrained solve and an obstacle-avoiding plan.
+"""Plan through a test environment and plot the result.
 
     pip install "coast-planner[viz]"
-    coast-planner-demo              # opens windows
-    coast-planner-demo --save out   # writes PNGs to ./out instead
+    coast-planner-demo                      # the simple environment; opens windows
+    coast-planner-demo --env hard           # weave through pillars, then a window
+    coast-planner-demo --mode free          # only the unconstrained (no-corridor) solve
+    coast-planner-demo --save out           # writes PNGs to ./out instead
+
+Design your own environment by exporting a built-in one, editing the JSON, and running it:
+
+    coast-planner-demo --env hard --export my_env.json
+    coast-planner-demo --env my_env.json
 
 (`python python/examples/plot_demo.py` in a clone of the repository runs the same demo.)
 
-If plot windows cannot be opened (no Tk on this Python, no display over SSH), the demo says
-why and saves the PNGs to ./coast_demo_plots instead.
+After planning, the demo checks the result (did it reach the goal, does it keep the drone
+radius clear of every obstacle) and exits with status 1 if a check fails, so it can also be
+used to hunt for planner bugs. If plot windows cannot be opened (no Tk on this Python, no
+display over SSH), the demo says why and saves the PNGs to ./coast_demo_plots instead.
 
 Coordinates are NED; plots display East-North-Up (altitude = -z).
 """
 
 import argparse
 import contextlib
-import glob
 import os
-import sys
 
 import numpy as np
 
-from coast_planner import (FrontEndConfig, MinSnapClamped, ObstacleBox, SparseVoxelGrid,
-                      TrajectoryPlanner)
+from coast_planner import MinSnapClamped, TrajectorySampler
 from coast_planner.plot import plot_plan, plot_profiles, plot_trajectory
+from coast_planner.scenarios import BUILTIN, box_clearance, load
 
 FALLBACK_DIR = "coast_demo_plots"
 # Backends that render to files only; with one of these, plt.show() silently does nothing.
 _NON_INTERACTIVE = {"agg", "cairo", "pdf", "pgf", "ps", "svg", "template"}
-
-
-def _point_tcl_at_base_python():
-    """Set TCL_LIBRARY/TK_LIBRARY to the base Python's Tcl/Tk files; True if anything was set.
-
-    Python 3.13.0 on Windows cannot find its Tcl library from inside a venv (fixed in 3.13.1):
-    Tcl searches next to the venv's interpreter rather than in the base install's tcl folder.
-    """
-    if sys.platform != "win32" or "TCL_LIBRARY" in os.environ:
-        return False
-    tcl_root = os.path.join(sys.base_prefix, "tcl")
-    tcl = [os.path.dirname(p) for p in glob.glob(os.path.join(tcl_root, "tcl*", "init.tcl"))]
-    tk = [os.path.dirname(p) for p in glob.glob(os.path.join(tcl_root, "tk*", "tk.tcl"))]
-    if not tcl:
-        return False
-    os.environ["TCL_LIBRARY"] = tcl[0]
-    if tk and "TK_LIBRARY" not in os.environ:
-        os.environ["TK_LIBRARY"] = tk[0]
-    return True
-
-
-def _try_open_figure():
-    """None if a figure (and so the window toolkit) opens; otherwise a one-line reason."""
-    import matplotlib.pyplot as plt
-    try:
-        plt.close(plt.figure())  # creating a figure opens the toolkit; fails fast if broken
-    except Exception as e:  # noqa: BLE001 - any failure here means "no windows"
-        return f"{type(e).__name__}: {str(e).splitlines()[0]}"
-    return None
+# Clearance shortfall tolerated before the demo calls it a violation (m). The corridor chain
+# has known millimetre-scale excursions; see docs/limitations.md.
+_CLEARANCE_TOL = 0.01
 
 
 def can_open_windows():
@@ -64,9 +45,7 @@ def can_open_windows():
     Two common failure modes are caught. Either matplotlib already chose a file-only backend
     (Linux without python3-tk, or no display), so plt.show() would silently do nothing. Or the
     window toolkit is installed but broken: on Windows, a Python whose Tcl/Tk files are
-    missing raises "Can't find a usable init.tcl" when the first window is created. That error
-    also comes from a venv made with Python 3.13.0, which is worked around by pointing Tcl at
-    the base install and retrying.
+    missing raises "Can't find a usable init.tcl" when the first window is created.
     """
     import matplotlib
     import matplotlib.pyplot as plt
@@ -75,9 +54,10 @@ def can_open_windows():
     if backend.lower() in _NON_INTERACTIVE:
         reason = f"matplotlib is using the file-only '{backend}' backend"
     else:
-        reason = _try_open_figure()
-        if reason and "init.tcl" in reason and _point_tcl_at_base_python():
-            reason = _try_open_figure()
+        try:
+            plt.close(plt.figure())  # creating a figure opens the toolkit; fails fast if broken
+        except Exception as e:  # noqa: BLE001 - any failure here means "no windows"
+            reason = f"{type(e).__name__}: {str(e).splitlines()[0]}"
     if reason is None:
         return True
     print(f"Cannot open plot windows ({reason}).\n"
@@ -103,10 +83,113 @@ def quiet_stdout():
         os.close(saved)
 
 
+def _samples(sampler, n=2000):
+    return sampler.sample(np.linspace(sampler.start_time, sampler.end_time, n))[:, :3]
+
+
+def check_endpoints(scenario):
+    """Problems with the start or goal themselves (inside an obstacle or its inflation)."""
+    problems = []
+    for label, p in (("start", scenario.start), ("goal", scenario.goal)):
+        clearance = box_clearance(p, scenario.obstacles) if scenario.obstacles else np.inf
+        if clearance < scenario.drone_radius:
+            problems.append(f"the {label} {list(p)} is within the drone radius "
+                            f"({scenario.drone_radius} m) of an obstacle")
+    return problems
+
+
+def check_plan(scenario, result):
+    """Problems with a plan: refused, stopped short, or too close to an obstacle.
+
+    Clearance is measured against the obstacle boxes themselves, not the voxel map: the map
+    rounds each box outward to whole cells, so it is conservative by up to one voxel.
+    """
+    if not result.success:
+        return ["the planner found no trajectory (success=False). Run with --verbose to see "
+                "why it refused."]
+    problems = []
+    P = _samples(result.sampler())
+    if not result.reached_goal:
+        gap = float(np.linalg.norm(P[-1] - np.asarray(scenario.goal, float)))
+        problems.append(f"the plan stops {gap:.2f} m short of the goal (reached_goal=False); "
+                        "a goal beyond planning_horizon is the usual cause")
+    if scenario.obstacles:
+        clearance = box_clearance(P, scenario.obstacles)
+        if clearance < scenario.drone_radius - _CLEARANCE_TOL:
+            problems.append(f"the trajectory passes {clearance:.3f} m from an obstacle, inside "
+                            f"the drone radius ({scenario.drone_radius} m)")
+    return problems
+
+
+def free_space_figures(scenario):
+    """The closed-form minimum-snap solve from start to goal, ignoring obstacles."""
+    start, goal = np.asarray(scenario.start, float), np.asarray(scenario.goal, float)
+    # Average half of v_max, so the peak speed of a rest-to-rest minimum-snap path (about twice
+    # the average) stays near v_max; at least 4 s so short hops stay smooth.
+    duration = max(4.0, 2.0 * float(np.linalg.norm(goal - start)) / scenario.v_max)
+    solver = MinSnapClamped(num_segments=10)
+    dt = duration / 10
+    z = np.zeros(3)
+    C = solver.solve_unconstrained(p0=start, v0=z, a0=z, pf=goal, vf=z, af=z, dt=dt)
+    knots = solver.scaled_knots(dt)
+
+    path = _samples(TrajectorySampler(C, knots, solver.degree))
+    clearance = box_clearance(path, scenario.obstacles) if scenario.obstacles else np.inf
+    if clearance < scenario.drone_radius:
+        verdict = (f"comes within {clearance:.2f} m of an obstacle (drone radius "
+                   f"{scenario.drone_radius} m): the corridors are what keep the plan clear")
+    else:
+        verdict = f"stays {clearance:.2f} m from every obstacle"
+    print(f"Free-space solve (no corridors, ignores obstacles): {verdict}.")
+
+    ax = plot_trajectory(C, knots, solver.degree, obstacles=scenario.obstacles)
+    ax.set_title(f"{scenario.name}: unconstrained minimum snap (no corridors)")
+    fig = plot_profiles(C, knots, solver.degree,
+                        title=f"{scenario.name}: unconstrained solve, derivatives")
+    return {"unconstrained_3d": ax.figure, "unconstrained_profiles": fig}
+
+
+def plan_figures(scenario, verbose=False):
+    """Plan through the corridors, check the result, and plot it. Returns (figures, problems)."""
+    problems = check_endpoints(scenario)
+    with contextlib.nullcontext() if verbose else quiet_stdout():
+        result, _ = scenario.plan()
+    print(result)
+    problems += check_plan(scenario, result)
+
+    kw = dict(obstacles=scenario.obstacles, start=scenario.start, goal=scenario.goal)
+    ax3 = plot_plan(result, **kw)
+    ax4 = plot_plan(result, view="top", **kw)
+    figs = {"plan_3d": ax3.figure, "plan_top": ax4.figure}
+    if result.success:
+        figs["plan_profiles"] = plot_profiles(
+            result, v_max=scenario.v_max, a_max=scenario.a_max,
+            title=f"{scenario.name}: planned trajectory, derivatives (limits are per axis)")
+    return figs, problems
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="coast-planner-demo", description=__doc__.splitlines()[0])
+    ap.add_argument("--env", default="simple", metavar="NAME_OR_FILE",
+                    help=f"built-in environment ({', '.join(BUILTIN)}) or a .json file "
+                         "(default: simple)")
+    ap.add_argument("--mode", choices=("both", "sfc", "free"), default="both",
+                    help="sfc: plan through Safe Flight Corridors; free: the unconstrained "
+                         "minimum-snap solve, which ignores obstacles; both (default)")
     ap.add_argument("--save", metavar="DIR", help="write PNGs here instead of showing windows")
+    ap.add_argument("--export", metavar="FILE",
+                    help="write the environment to a JSON file to edit, then exit")
+    ap.add_argument("--verbose", action="store_true", help="show the planner's own log")
     args = ap.parse_args(argv)
+
+    try:
+        scenario = load(args.env)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise SystemExit(f"Cannot load environment {args.env!r}: {e}")
+    if args.export:
+        scenario.save(args.export)
+        print(f"Wrote {args.export}. Edit it, then run:  coast-planner-demo --env {args.export}")
+        return
 
     try:
         import matplotlib
@@ -118,36 +201,21 @@ def main(argv=None):
         args.save = FALLBACK_DIR
     import matplotlib.pyplot as plt
 
-    # 1. Free space, no map: the closed-form minimum-snap solve.
-    dt = 0.5
-    solver = MinSnapClamped(num_segments=10)
-    z = np.zeros(3)
-    C = solver.solve_unconstrained(p0=[0, 0, -2], v0=[2, 0, 0], a0=z,
-                                   pf=[10, 6, -5], vf=[0, 1, 0], af=z, dt=dt)
-    knots = solver.scaled_knots(dt)
-    ax1 = plot_trajectory(C, knots, solver.degree)
-    ax1.set_title("Unconstrained minimum snap (clamped, 10 segments)")
-    fig2 = plot_profiles(C, knots, solver.degree, title="Unconstrained solve: derivatives")
+    print(f"Environment '{scenario.name}': {scenario.description or 'no description'} "
+          f"({len(scenario.obstacles)} obstacles)")
+    figs, problems = {}, []
+    if args.mode in ("free", "both"):
+        figs.update(free_space_figures(scenario))
+    if args.mode in ("sfc", "both"):
+        plan_figs, problems = plan_figures(scenario, verbose=args.verbose)
+        figs.update(plan_figs)
+        if problems:
+            print("\nCHECKS FAILED:\n  - " + "\n  - ".join(problems))
+            print("If this looks like a planner bug, attach the environment file (save a "
+                  "built-in one with --export) to an issue.")
+        else:
+            print("Checks passed: reached the goal with the drone radius clear of every obstacle.")
 
-    # 2. Obstacle avoidance: two pillars between start and goal.
-    radius = 0.49
-    boxes = [ObstacleBox([4.5, -0.5, -7.0], [5.5, 0.5, 0.0]),
-             ObstacleBox([7.5, 1.5, -7.0], [8.5, 2.5, 0.0])]
-    grid = SparseVoxelGrid(resolution=0.5, inflation_radius=radius)
-    grid.update_from_obstacles(boxes)
-    cfg = FrontEndConfig(voxel_resolution=0.5, drone_physical_radius=radius,
-                         min_altitude=radius + 0.1, planning_horizon=12.0)
-    start, goal = [0.0, 0.0, -3.0], [11.0, 0.0, -3.0]
-    with quiet_stdout():
-        result = TrajectoryPlanner(cfg, grid, v_max=3.0, a_max=2.0).plan_mission(start, goal)
-    print(result)
-    ax3 = plot_plan(result, obstacles=boxes, start=start, goal=goal)
-    ax4 = plot_plan(result, obstacles=boxes, start=start, goal=goal, view="top")
-    fig5 = plot_profiles(result, v_max=3.0, a_max=2.0,
-                         title="Planned trajectory: derivatives (limits are per axis)")
-
-    figs = {"unconstrained_3d": ax1.figure, "unconstrained_profiles": fig2,
-            "plan_3d": ax3.figure, "plan_top": ax4.figure, "plan_profiles": fig5}
     if args.save:
         os.makedirs(args.save, exist_ok=True)
         for name, fig in figs.items():
@@ -156,6 +224,8 @@ def main(argv=None):
             print("wrote", path)
     else:
         plt.show()
+    if problems:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

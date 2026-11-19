@@ -152,13 +152,32 @@ def _box_corners(box):
                      [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]])
 
 
+def _draw_obstacles(ax, obstacles, frame):
+    """Draw ObstacleBoxes (solid in 3-D, filled outlines in top view); returns their extents."""
+    three_d = _is_3d(ax)
+    dim = 3 if three_d else 2
+    extent = []
+    for box in obstacles or ():
+        V = _disp(_box_corners(box), frame)
+        extent.append(V[:, :dim])
+        if three_d:
+            from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+            ax.add_collection3d(Poly3DCollection([V[list(f)] for f in _BOX_FACES],
+                                                 facecolor="0.35", edgecolor="0.2",
+                                                 alpha=0.35, linewidths=0.5))
+        else:
+            H = _convex_hull_2d(V[:, :2])
+            ax.fill(*H.T, color="0.35", alpha=0.45, lw=0.5, ec="0.2")
+    return extent
+
+
 # ----------------------------------------------------------------------------------------------
 # Public API
 # ----------------------------------------------------------------------------------------------
 
 def plot_trajectory(traj, knots=None, degree=None, *, ax=None, view="3d", frame="ned",
                     samples=400, color_by_speed=True, show_control_points=True, label=None,
-                    colorbar=True):
+                    colorbar=True, obstacles=None):
     """Plot the path of a spline.
 
     Args:
@@ -172,6 +191,8 @@ def plot_trajectory(traj, knots=None, degree=None, *, ax=None, view="3d", frame=
         samples: number of time samples along the curve.
         color_by_speed: colour the path by speed, with a colour bar.
         show_control_points: draw the control polygon (not available for a bare sampler).
+        obstacles: optional list of ``ObstacleBox`` to draw as boxes, e.g. to see where an
+            unconstrained solve would collide.
 
     Returns:
         The matplotlib Axes.
@@ -218,7 +239,7 @@ def plot_trajectory(traj, knots=None, degree=None, *, ax=None, view="3d", frame=
     ax.set_ylabel(yl)
     if three_d:
         ax.set_zlabel(zl)
-    _equal_aspect(ax, XY)
+    _equal_aspect(ax, np.vstack([XY, *_draw_obstacles(ax, obstacles, frame)]))
     return ax
 
 
@@ -289,18 +310,7 @@ def plot_plan(result, *, grid=None, obstacles=None, start=None, goal=None, ax=No
     dim = 3 if three_d else 2
     extent = []  # display points used for the axis limits
 
-    if obstacles:
-        for box in obstacles:
-            V = _disp(_box_corners(box), frame)
-            extent.append(V[:, :dim])
-            if three_d:
-                from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-                ax.add_collection3d(Poly3DCollection([V[list(f)] for f in _BOX_FACES],
-                                                     facecolor="0.35", edgecolor="0.2",
-                                                     alpha=0.35, linewidths=0.5))
-            else:
-                H = _convex_hull_2d(V[:, :2])
-                ax.fill(*H.T, color="0.35", alpha=0.45, lw=0.5, ec="0.2")
+    extent += _draw_obstacles(ax, obstacles, frame)
 
     if grid is not None:
         idx = np.asarray(grid.occupied_indices(), dtype=float)

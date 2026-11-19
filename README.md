@@ -82,6 +82,11 @@ plot windows can't open on your machine (for example, Python without Tcl/Tk, or 
 session), the demo explains why and saves the plots as PNG files in `coast_demo_plots/`
 instead. The planner itself works either way.
 
+`coast-planner-demo --env hard` plans through a harder environment: three staggered rows of
+pillars and then a window in a wall. You can also design your own environments as JSON files
+to test the planner on; see
+[Test environments](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/docs/python.md#test-environments-and-the-demo).
+
 To modify the code, install in editable mode instead: `pip install -e ".[viz,test]"`. Python
 edits then apply immediately; re-run it after changing C++. To use the C++ library directly
 with CMake, see [docs/building.md](https://github.com/byu-magicc/Minimum-Snap-Trajectories/blob/main/docs/building.md).
