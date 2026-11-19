@@ -50,6 +50,9 @@ The first release, 0.1.0, will be cut from this section.
   `plot_trajectory`, `plot_profiles` and `plot_plan` for trajectories, derivative profiles
   and plans with their corridors and obstacles. Python `Corridor` objects gain `vertices`.
   (#27)
+- `coast-planner-demo` command, installed with the package: runs the plotting demo after a
+  `pip install` without cloning the repository (the code moved to `coast_planner._demo`;
+  `python/examples/plot_demo.py` still works).
 - **Continuous integration** on Linux, macOS and Windows: C++ build, tests and example, plus
   `pip install` and pytest on Python 3.9 and 3.13. (#3, #7)
 - **Dependency bundling:** Eigen 3.4.0, OSQP v1.0.0 and GoogleTest 1.15.2 are downloaded when

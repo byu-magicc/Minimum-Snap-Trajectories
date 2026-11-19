@@ -114,3 +114,22 @@ def test_plot_plan_failed_result():
     ax = plot_plan(res, grid=grid)
     if not res.success:
         assert "failed" in ax.get_title()
+
+
+def test_demo_saves_all_plots(tmp_path):
+    from coast_planner._demo import main
+    main(["--save", str(tmp_path)])
+    names = sorted(p.name for p in tmp_path.glob("*.png"))
+    assert names == ["plan_3d.png", "plan_profiles.png", "plan_top.png",
+                     "unconstrained_3d.png", "unconstrained_profiles.png"]
+    assert all((tmp_path / n).stat().st_size > 1000 for n in names)
+
+
+def test_demo_command_is_installed():
+    from importlib.metadata import entry_points
+    eps = entry_points()
+    # Python 3.10+ returns a selectable EntryPoints; 3.9 returns a dict of group -> list
+    scripts = eps.select(group="console_scripts") if hasattr(eps, "select") \
+        else eps.get("console_scripts", [])
+    demo = [ep for ep in scripts if ep.name == "coast-planner-demo"]
+    assert demo and demo[0].value == "coast_planner._demo:main"

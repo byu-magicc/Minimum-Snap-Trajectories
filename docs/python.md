@@ -85,7 +85,7 @@ plt.show()
 Each function returns the matplotlib Axes or Figure (`ax.figure.savefig("plan.png")`) and
 never calls `plt.show()` itself, so it is safe in scripts and headless jobs. Plots display
 NED as East-North-Up (altitude = −z); pass `frame="raw"` to plot x, y, z unchanged.
-`python/examples/plot_demo.py` renders all of them.
+`coast-planner-demo` (or `python/examples/plot_demo.py` in a clone) renders all of them.
 
 ## API reference
 

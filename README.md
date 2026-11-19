@@ -74,7 +74,7 @@ venv. In a new terminal, activate the environment again before using COAST.
 ### 3. Check that it works
 
 ```bash
-python python/examples/plot_demo.py
+coast-planner-demo
 ```
 
 This opens plots of a free-space trajectory and of a planned path around two obstacles. If

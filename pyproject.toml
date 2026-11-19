@@ -43,6 +43,10 @@ classifiers = [
 viz = ["matplotlib>=3.5"]
 test = ["pytest", "matplotlib>=3.5"]
 
+[project.scripts]
+# `coast-planner-demo`: plots an unconstrained solve and a plan around obstacles (needs [viz])
+coast-planner-demo = "coast_planner._demo:main"
+
 [project.urls]
 Homepage = "https://github.com/byu-magicc/Minimum-Snap-Trajectories"
 Documentation = "https://github.com/byu-magicc/Minimum-Snap-Trajectories#readme"
