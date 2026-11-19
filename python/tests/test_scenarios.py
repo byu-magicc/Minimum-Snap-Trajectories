@@ -62,6 +62,8 @@ def test_minimal_json_uses_defaults(tmp_path):
     ({"start": [0, 0, -2], "goal": [1, 0, -2],
       "obstacles": [{"min": [1, 0, -1], "max": [0, 1, 0]}]}, "below"),
     ({"start": [0, 0, -2], "goal": [1, 0, -2], "speed": 3}, "unknown scenario keys"),
+    ({"start": [0, 0, -2], "goal": [1, 0, -2], "config": {"voxel_resolution": 0.25}},
+     "top level"),
 ])
 def test_invalid_scenarios_are_rejected(bad, match):
     with pytest.raises(ValueError, match=match):
@@ -72,6 +74,15 @@ def test_unknown_config_field_is_rejected():
     with pytest.raises(Exception):
         Scenario.from_dict({"start": [0, 0, -2], "goal": [1, 0, -2],
                             "config": {"planing_horizon": 10}})
+
+
+def test_voxel_resolution_and_no_horizon_reach_the_planner():
+    sc = Scenario.from_dict({"start": [0, 0, -2], "goal": [40, 0, -2], "voxel_resolution": 0.4})
+    cfg = sc.front_end_config()
+    assert cfg.voxel_resolution == 0.4 and sc.grid().resolution == 0.4
+    assert cfg.planning_horizon == 0.0  # off: plan all the way to the goal
+    result, _ = sc.plan()
+    assert result.success and result.reached_goal  # 40 m, far beyond the library default 12 m
 
 
 def test_unknown_name_is_rejected():
@@ -132,13 +143,47 @@ def test_demo_export_then_run(tmp_path):
     assert len(list((tmp_path / "out").glob("*.png"))) == 3
 
 
-def test_demo_reports_failed_checks(tmp_path, capsys):
-    # Start inside a pillar: the demo must say so and exit non-zero, not crash.
+def run_demo(tmp_path, scenario, *extra):
     from coast_planner._demo import main
-    path = tmp_path / "bad.json"
-    path.write_text(json.dumps({"start": [5, 0, -3], "goal": [10, 0, -3],
-                                "obstacles": [{"min": [4.5, -0.5, -7], "max": [5.5, 0.5, 0]}]}))
+    path = tmp_path / "env.json"
+    scenario.save(path)
     with pytest.raises(SystemExit) as exit_info:
-        main(["--env", str(path), "--mode", "sfc", "--save", str(tmp_path / "out")])
-    assert exit_info.value.code == 1
-    assert "start" in capsys.readouterr().out
+        main(["--env", str(path), "--mode", "sfc", "--save", str(tmp_path / "out"), *extra])
+    return exit_info.value.code
+
+
+def test_demo_invalid_environment_exits_2(tmp_path, capsys):
+    # Start inside a pillar: the demo must say so and exit non-zero, not crash.
+    sc = Scenario("bad", start=[5, 0, -3], goal=[10, 0, -3], obstacles=[pillar(5.0, 0.0)])
+    assert run_demo(tmp_path, sc) == 2
+    out = capsys.readouterr().out
+    assert "Invalid environment" in out and "start" in out
+
+
+def test_demo_optimiser_refusal_is_not_called_a_bug(tmp_path, capsys):
+    # A window above the start and goal: A* finds a route, but its corridors are too thin
+    # for the optimiser. That can be genuine infeasibility, so exit 2, not the bug status 1.
+    sc = Scenario("raised", start=[0, 0, -2], goal=[9, 0, -2],
+                  obstacles=wall_with_window(5.0, 6.0, (-1.5, 1.5), (3.0, 5.5)))
+    assert run_demo(tmp_path, sc) == 2
+    out = capsys.readouterr().out
+    assert "not necessarily a bug" in out and "CHECKS FAILED" not in out
+
+
+def test_assess_flags_a_trajectory_through_an_obstacle():
+    from coast_planner._demo import assess
+    sc = load("simple")
+    result, _ = sc.plan()
+    assert assess(sc, result) == ("ok", [])
+    # Drop a box onto the planned path afterwards: the same trajectory is now a violation.
+    mid = path_points(result)[1500]
+    sc.obstacles.append(ObstacleBox(mid - 0.2, mid + 0.2))
+    outcome, messages = assess(sc, result)
+    assert outcome == "violation" and "0.000 m" in messages[0]
+
+
+def test_demo_voxel_flag(tmp_path, capsys):
+    from coast_planner._demo import main
+    main(["--env", "simple", "--mode", "sfc", "--voxel", "0.3", "--save", str(tmp_path)])
+    out = capsys.readouterr().out
+    assert "0.3 m voxels" in out and "Planning time" in out

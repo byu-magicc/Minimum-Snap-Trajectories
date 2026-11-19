@@ -103,6 +103,7 @@ environments are built in:
 coast-planner-demo --env hard               # plan through the hard environment
 coast-planner-demo --env hard --mode sfc    # only the corridor-constrained plan
 coast-planner-demo --env hard --mode free   # only the unconstrained solve, drawn with the obstacles
+coast-planner-demo --env hard --voxel 0.25  # the same environment on a finer map
 coast-planner-demo --env hard --verbose     # also print the planner's own log
 coast-planner-demo --env hard --save out    # write PNGs to ./out instead of opening windows
 ```
@@ -111,9 +112,26 @@ coast-planner-demo --env hard --save out    # write PNGs to ./out instead of ope
 It ignores the obstacles, so it usually flies straight through them, which is why the
 corridors exist. `--mode sfc` runs `TrajectoryPlanner`. The default, `both`, shows both.
 
-After planning, the demo checks that the plan succeeded, reached the goal, and stayed at least
-the drone radius away from every obstacle box. If a check fails it says which one and exits
-with status 1, so a failing environment is a ready-made bug report.
+The demo plans all the way from start to goal: the planning horizon is off
+(`planning_horizon = 0`). An environment tests whether the planner can weave through the
+obstacles from A to B; how far ahead to plan on each replan is a choice for whoever
+integrates the planner. To test with a horizon anyway, set `planning_horizon` in `config`.
+
+It prints the planning time, split into the front end (A* and corridors) and the optimiser.
+A route of 15 m or less through moderate clutter should plan in roughly 5–10 ms (the `hard`
+environment takes about 7 ms at 0.5 m voxels), and the demo adds a note when one takes
+longer. Then it classifies the result:
+
+| Outcome | Meaning | Exit status |
+|---|---|---|
+| Checks passed | Reached the goal, at least the drone radius from every obstacle box. | 0 |
+| Checks failed | The planner reported success, but the trajectory comes closer than the drone radius to an obstacle or stops short of the goal. **Likely a planner bug**: please report it with the environment file. | 1 |
+| No trajectory, optimiser refused | A* found a route, but the optimiser found no feasible trajectory through its corridors. The route can be genuinely too tight to fly within the limits, so this is **not necessarily a bug**. `--verbose` shows which constraints blocked it. | 2 |
+| No trajectory, no route | A* found no route to the goal. | 2 |
+| Invalid environment | The start or goal is within the drone radius of an obstacle. | 2 |
+
+Clearance is measured against the obstacle boxes themselves, not the voxel map, because the
+map is deliberately conservative (see below).
 
 ### Designing your own environment
 
@@ -136,7 +154,8 @@ coast-planner-demo --env my_env.json
   "drone_radius": 0.49,
   "v_max": 3.0,
   "a_max": 2.0,
-  "config": {"planning_horizon": 18.0}
+  "voxel_resolution": 0.5,
+  "config": {"sfc_width": 5.0}
 }
 ```
 
@@ -146,7 +165,8 @@ coast-planner-demo --env my_env.json
 - **Obstacles are axis-aligned boxes**, given by opposite corners `min` and `max` (every `min`
   coordinate below the matching `max`). Build pillars, walls and windows out of several boxes.
   `note` is ignored; use it to label boxes.
-- Only `start` and `goal` are required. `config` takes any `FrontEndConfig` field (see
+- Only `start` and `goal` are required. `voxel_resolution` is the map cell size; `--voxel`
+  overrides it from the command line. `config` takes any other `FrontEndConfig` field (see
   [configuration.md](configuration.md)), and misspelled fields are rejected.
 
 Things worth knowing while tinkering:
@@ -156,11 +176,11 @@ Things worth knowing while tinkering:
   can therefore add a whole row of cells, and close a gap that looked wide enough. In the
   `hard` environment, widening the pillars from 1.0 m to 1.1 m makes every variant
   infeasible.
+- **Try more than one voxel size.** An environment that plans at one resolution can fail, or
+  plan worse, at another, so `--voxel` is a quick robustness check. Finer maps also cost much
+  more front-end time.
 - **A gap must be about `2 × drone_radius` plus a cell or more wider than the obstacles
   beside it.** Two pillars 1 m apart with a 0.49 m drone leave almost nothing after inflation.
-- **The goal should be within `planning_horizon`** of the start, or the plan stops short at
-  the horizon (`reached_goal=False`). Raising the horizon costs planning time; see
-  [limitations.md](limitations.md#gotchas).
 - **Openings approached at an angle are hard.** A window that is offset sideways or vertically
   from the approach, or a gap under an overhang, often fails where the same opening lined up
   with the path succeeds.
@@ -172,13 +192,13 @@ from coast_planner.scenarios import Scenario, load, pillar, wall, wall_with_wind
 
 sc = load("hard")                         # or load("my_env.json")
 sc.obstacles.append(pillar(14.5, 1.0))    # add a pillar behind the window
+sc.voxel_resolution = 0.4                 # and try a different map resolution
 result, grid = sc.plan()
 print(result.success, result.reached_goal)
 sc.save("hard_plus_pillar.json")          # then: coast-planner-demo --env hard_plus_pillar.json
 
 custom = Scenario(name="corridor", start=[0, 0, -2], goal=[12, 0, -2],
-                  obstacles=[wall(6.0, -6.0, -1.5), wall(6.0, 1.5, 6.0)],  # a 3 m gap
-                  config={"planning_horizon": 14.0})
+                  obstacles=[wall(6.0, -6.0, -1.5), wall(6.0, 1.5, 6.0)])  # a 3 m gap
 ```
 
 ## API reference

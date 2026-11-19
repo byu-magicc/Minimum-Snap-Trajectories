@@ -15,11 +15,14 @@ The first release, 0.1.0, will be cut from this section.
 ### Added
 
 - **Demo environments** (`coast_planner.scenarios`): `coast-planner-demo --env NAME` plans
-  through the built-in `simple` or `hard` environment, or a user-designed JSON file. `--mode sfc|free|both` picks the
-  corridor-constrained plan, the unconstrained solve or both; `--export FILE` writes an
-  environment as editable JSON; `--verbose` shows the planner log. After planning, the demo
-  checks the plan reached the goal with the drone radius clear of every obstacle and exits
-  with status 1 if not. `plot_trajectory` gains `obstacles=`.
+  through the built-in `simple` or `hard` environment, or a user-designed JSON file, all the
+  way to the goal (no planning horizon). `--mode sfc|free|both` picks the
+  corridor-constrained plan, the unconstrained solve or both; `--voxel` sets the map
+  resolution; `--export FILE` writes an environment as editable JSON; `--verbose` shows the
+  planner log. The demo reports planning time and classifies the result: exit status 1 when
+  a successful plan comes too close to an obstacle or misses the goal (likely a bug), 2 when
+  there is no trajectory (including optimiser refusals, which are not necessarily bugs).
+  `plot_trajectory` gains `obstacles=`.
 - `licenses/`: license texts and notices for the third-party code compiled into the wheels
   (OSQP, QDLDL, AMD, Eigen, pybind11, nanoflann), included in every wheel. The library is
   compiled with `EIGEN_MPL2_ONLY` as a guard against including any non-MPL2 Eigen code.

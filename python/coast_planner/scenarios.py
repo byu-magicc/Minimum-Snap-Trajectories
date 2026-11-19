@@ -77,12 +77,18 @@ class Scenario:
     drone_radius: float = 0.49
     v_max: float = 3.0
     a_max: float = 2.0
-    config: dict = field(default_factory=dict)  # FrontEndConfig fields, e.g. planning_horizon
+    voxel_resolution: float = 0.5  # map cell size (m)
+    config: dict = field(default_factory=dict)  # other FrontEndConfig fields
 
     def front_end_config(self):
-        kw = dict(voxel_resolution=0.5, drone_physical_radius=self.drone_radius,
-                  min_altitude=self.drone_radius + 0.1, planning_horizon=12.0)
+        """The planner settings. Unlike the library default, the planning horizon is off
+        (``planning_horizon=0``), so A* searches all the way to the goal: an environment tests
+        whether the planner can get from start to goal, and how far ahead to plan is the
+        integrator's choice. Set ``planning_horizon`` in ``config`` to test with one."""
+        kw = dict(drone_physical_radius=self.drone_radius,
+                  min_altitude=self.drone_radius + 0.1, planning_horizon=0.0)
         kw.update(self.config)
+        kw["voxel_resolution"] = self.voxel_resolution
         return FrontEndConfig(**kw)
 
     def grid(self):
@@ -111,7 +117,8 @@ class Scenario:
               ],
               "drone_radius": 0.49,           # obstacles are inflated by this
               "v_max": 3.0, "a_max": 2.0,     # per-axis limits (m/s, m/s^2)
-              "config": {"planning_horizon": 16.0}   # any FrontEndConfig field
+              "voxel_resolution": 0.5,        # map cell size (m)
+              "config": {"sfc_width": 5.0}    # any other FrontEndConfig field
             }
         """
         return {
@@ -124,18 +131,23 @@ class Scenario:
             "drone_radius": self.drone_radius,
             "v_max": self.v_max,
             "a_max": self.a_max,
+            "voxel_resolution": self.voxel_resolution,
             "config": dict(self.config),
         }
 
     @classmethod
     def from_dict(cls, d, name="custom"):
         unknown = set(d) - {"name", "description", "start", "goal", "obstacles", "drone_radius",
-                            "v_max", "a_max", "config"}
+                            "v_max", "a_max", "voxel_resolution", "config"}
         if unknown:
             raise ValueError(f"unknown scenario keys: {sorted(unknown)}")
         for key in ("start", "goal"):
             if key not in d or len(d[key]) != 3:
                 raise ValueError(f"scenario needs '{key}' as [x, y, z] (NED)")
+        for key in ("voxel_resolution", "drone_physical_radius"):
+            if key in d.get("config", {}):
+                top = "drone_radius" if key == "drone_physical_radius" else key
+                raise ValueError(f"set '{top}' at the top level of the file, not in 'config'")
         obstacles = []
         for i, o in enumerate(d.get("obstacles", [])):
             lo, hi = o.get("min"), o.get("max")
@@ -147,7 +159,7 @@ class Scenario:
         s = cls(name=d.get("name", name), start=list(d["start"]), goal=list(d["goal"]),
                 obstacles=obstacles, description=d.get("description", ""),
                 config=dict(d.get("config", {})))
-        for key in ("drone_radius", "v_max", "a_max"):
+        for key in ("drone_radius", "v_max", "a_max", "voxel_resolution"):
             if key in d:
                 setattr(s, key, float(d[key]))
         s.front_end_config()  # unknown config fields raise here, not mid-plan
@@ -169,8 +181,7 @@ def _simple():
         name="simple",
         description="Two pillars between start and goal.",
         start=[0.0, 0.0, -3.0], goal=[11.0, 0.0, -3.0],
-        obstacles=[pillar(5.0, 0.0, height=7.0), pillar(8.0, 2.0, height=7.0)],
-        config={"planning_horizon": 12.0})
+        obstacles=[pillar(5.0, 0.0, height=7.0), pillar(8.0, 2.0, height=7.0)])
 
 
 def _hard():
@@ -187,8 +198,7 @@ def _hard():
         description="Weave through three staggered rows of pillars, then fly through a window.",
         start=[0.0, 0.0, -2.0], goal=[16.0, 0.0, -2.0],
         obstacles=rows + wall_with_window(13.0, 6.0, window_east=(-1.75, 1.75),
-                                          window_alt=(0.75, 3.25)),
-        config={"planning_horizon": 18.0})
+                                          window_alt=(0.75, 3.25)))
 
 
 # Built-in scenarios by name. Each call returns a fresh Scenario, so editing one is safe.
