@@ -40,7 +40,7 @@ You need Python 3.9 or newer, git, and a C++17 compiler:
 
 | OS | Install |
 |---|---|
-| Ubuntu / Debian | `sudo apt install build-essential git python3-venv python3-tk` |
+| Ubuntu / Debian | `sudo apt install build-essential git python3-dev python3-venv python3-tk` |
 | macOS | `xcode-select --install` (Python 3 from [python.org](https://www.python.org/downloads/) or Homebrew) |
 | Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the workload **"Desktop development with C++"**, [Git](https://git-scm.com/download/win), and Python from [python.org](https://www.python.org/downloads/) (keep the installer's default **"tcl/tk and IDLE"** option; plot windows need it) |
 

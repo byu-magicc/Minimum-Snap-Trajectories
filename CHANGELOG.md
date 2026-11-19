@@ -109,5 +109,7 @@ The first release, 0.1.0, will be cut from this section.
 - The README documented `unknown_traversal_cost = 2.0`, a value that makes A* flood outward;
   the real default is 0.5. Also corrected `astar_max_nodes` (3000) and `planning_horizon`
   (12.0). (#8)
+- README: the Ubuntu prerequisites now include `python3-dev`, without which `pip install`
+  fails on a fresh install. (#46)
 
 [Unreleased]: https://github.com/byu-magicc/Minimum-Snap-Trajectories/commits/main
