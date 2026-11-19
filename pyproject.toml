@@ -44,7 +44,7 @@ viz = ["matplotlib>=3.5"]
 test = ["pytest", "matplotlib>=3.5"]
 
 [project.scripts]
-# `coast-planner-demo`: plots an unconstrained solve and a plan around obstacles (needs [viz])
+# `coast-planner-demo`: plans through a test environment and plots it (needs [viz]); --help
 coast-planner-demo = "coast_planner._demo:main"
 
 [project.urls]
