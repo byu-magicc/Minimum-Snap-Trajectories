@@ -14,7 +14,9 @@ Coordinates are NED; plots display East-North-Up (altitude = -z).
 
 import argparse
 import contextlib
+import glob
 import os
+import sys
 
 import numpy as np
 
@@ -27,13 +29,44 @@ FALLBACK_DIR = "coast_demo_plots"
 _NON_INTERACTIVE = {"agg", "cairo", "pdf", "pgf", "ps", "svg", "template"}
 
 
+def _point_tcl_at_base_python():
+    """Set TCL_LIBRARY/TK_LIBRARY to the base Python's Tcl/Tk files; True if anything was set.
+
+    Python 3.13.0 on Windows cannot find its Tcl library from inside a venv (fixed in 3.13.1):
+    Tcl searches next to the venv's interpreter rather than in the base install's tcl folder.
+    """
+    if sys.platform != "win32" or "TCL_LIBRARY" in os.environ:
+        return False
+    tcl_root = os.path.join(sys.base_prefix, "tcl")
+    tcl = [os.path.dirname(p) for p in glob.glob(os.path.join(tcl_root, "tcl*", "init.tcl"))]
+    tk = [os.path.dirname(p) for p in glob.glob(os.path.join(tcl_root, "tk*", "tk.tcl"))]
+    if not tcl:
+        return False
+    os.environ["TCL_LIBRARY"] = tcl[0]
+    if tk and "TK_LIBRARY" not in os.environ:
+        os.environ["TK_LIBRARY"] = tk[0]
+    return True
+
+
+def _try_open_figure():
+    """None if a figure (and so the window toolkit) opens; otherwise a one-line reason."""
+    import matplotlib.pyplot as plt
+    try:
+        plt.close(plt.figure())  # creating a figure opens the toolkit; fails fast if broken
+    except Exception as e:  # noqa: BLE001 - any failure here means "no windows"
+        return f"{type(e).__name__}: {str(e).splitlines()[0]}"
+    return None
+
+
 def can_open_windows():
     """True if matplotlib can open plot windows here; otherwise explain why and return False.
 
     Two common failure modes are caught. Either matplotlib already chose a file-only backend
     (Linux without python3-tk, or no display), so plt.show() would silently do nothing. Or the
     window toolkit is installed but broken: on Windows, a Python whose Tcl/Tk files are
-    missing raises "Can't find a usable init.tcl" when the first window is created.
+    missing raises "Can't find a usable init.tcl" when the first window is created. That error
+    also comes from a venv made with Python 3.13.0, which is worked around by pointing Tcl at
+    the base install and retrying.
     """
     import matplotlib
     import matplotlib.pyplot as plt
@@ -42,10 +75,9 @@ def can_open_windows():
     if backend.lower() in _NON_INTERACTIVE:
         reason = f"matplotlib is using the file-only '{backend}' backend"
     else:
-        try:
-            plt.close(plt.figure())  # creating a figure opens the toolkit; fails fast if broken
-        except Exception as e:  # noqa: BLE001 - any failure here means "no windows"
-            reason = f"{type(e).__name__}: {str(e).splitlines()[0]}"
+        reason = _try_open_figure()
+        if reason and "init.tcl" in reason and _point_tcl_at_base_python():
+            reason = _try_open_figure()
     if reason is None:
         return True
     print(f"Cannot open plot windows ({reason}).\n"
